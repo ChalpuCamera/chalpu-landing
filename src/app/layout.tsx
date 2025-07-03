@@ -1,18 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
-import LayoutWrapper from "@/app/LayoutWrapper";
 import GoogleAnalytics from "@/components/lib/GoogleAnalytics";
+import { Suspense } from "react";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// 폰트 최적화: 필요한 weight만 로드하고 display=swap 사용
+const notoSansKR = Noto_Sans_KR({
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+  variable: "--font-noto-sans-kr",
+  preload: true,
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">로딩중...</p>
+      </div>
+    </div>
+  );
+}
 
 export const metadata: Metadata = {
   title: {
@@ -98,21 +108,32 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        {/* DNS prefetch for external resources */}
+        <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="//images.unsplash.com" />
+        <link rel="dns-prefetch" href="//www.googletagmanager.com" />
+
+        {/* Preconnect for critical resources */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+
         {/* 환경변수 적용 안될 때 사용 */}
-        {/* <meta
+        <meta
           name="google-site-verification"
           content={process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
         />
         <meta
           name="naver-site-verification"
           content={process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION}
-        /> */}
+        />
         <GoogleAnalytics />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <LayoutWrapper>{children}</LayoutWrapper>
+      <body className={`${notoSansKR.variable} font-noto antialiased`}>
+        <Suspense fallback={<LoadingFallback />}>{children}</Suspense>
       </body>
     </html>
   );
