@@ -26,7 +26,7 @@ const FooterSection = () => {
           <div>
             <h3 className="text-xl font-bold mb-4">Chalpu</h3>
             <p className="text-gray-300 mb-6">
-              자영업자를 위한 최고의 사진 촬영 가이드 및 AI 솔루션
+              자영업자를 위한 최고의 사진 촬영 가이드 및 솔루션
             </p>
             <div className="flex flex-col space-y-2">
               <p className="text-gray-300">
