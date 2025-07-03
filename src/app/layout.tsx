@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s | 찰푸",
   },
   description:
-    "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 AI 자동 보정으로 매출 증대를 경험하세요.",
+    "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
   keywords: [
     "음식사진",
     "소상공인",
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     url: "/",
     title: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
     description:
-      "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 AI 자동 보정으로 매출 증대를 경험하세요.",
+      "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
     siteName: "찰푸",
     images: [
       {
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
     description:
-      "플랫폼 사진 반려 걱정 없이! AI 기반 음식 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
+      "플랫폼 사진 반려 걱정 없이! 음식 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
     images: ["/og-image.jpg"],
   },
   robots: {
@@ -82,9 +82,10 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: process.env.GOOGLE_SITE_VERIFICATION,
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     other: {
-      "naver-site-verification": process.env.NAVER_SITE_VERIFICATION || "",
+      "naver-site-verification":
+        process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || "",
     },
   },
 };
@@ -97,6 +98,15 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        {/* 환경변수 적용 안될 때 사용 */}
+        {/* <meta
+          name="google-site-verification"
+          content={process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+        />
+        <meta
+          name="naver-site-verification"
+          content={process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION}
+        /> */}
         <GoogleAnalytics />
       </head>
       <body
