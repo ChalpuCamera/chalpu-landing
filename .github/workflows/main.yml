@@ -33,7 +33,7 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. PM2로 앱 재시작 (없으면 새로 시작)
-            pm2 restart chalpu || pm2 start npm --name chalpu -- run start -- -p 3000
+            pm2 restart chalpu-web || pm2 start npm --name chalpu-web -- run start -- -p 3000
 
             # 6. PM2 상태 저장 (서버 재부팅 시 자동 실행)
             pm2 save
