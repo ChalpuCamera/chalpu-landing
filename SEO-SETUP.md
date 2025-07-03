@@ -43,36 +43,79 @@
 
 ### 1. 환경 변수 설정
 
-`.env.local` 파일을 생성하고 다음 내용을 추가하세요:
+#### 로컬 개발 환경 (`.env.local`)
+
+프로젝트 루트에 `.env.local` 파일을 생성하고 다음 내용을 추가하세요:
 
 ```bash
 # 사이트 기본 설정
-NEXT_PUBLIC_SITE_URL=https://www.your-domain.com
+NEXT_PUBLIC_SITE_URL=https://www.chalpu.com
 
 # SEO 인증 키
-GOOGLE_SITE_VERIFICATION=your-google-site-verification-code
-NAVER_SITE_VERIFICATION=your-naver-site-verification-code
+GOOGLE_SITE_VERIFICATION=FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ
+NAVER_SITE_VERIFICATION=19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193
 
 # 분석 도구
-NEXT_PUBLIC_GOOGLE_ANALYTICS=G-XXXXXXXXXX
-NEXT_PUBLIC_GOOGLE_TAG_MANAGER=GTM-XXXXXXX
+NEXT_PUBLIC_GOOGLE_ANALYTICS=G-4S4Y8G91RJ
+
+# 선택사항 (추후 필요시 활성화)
+# NEXT_PUBLIC_GOOGLE_TAG_MANAGER=GTM-XXXXXXX
+# NEXT_PUBLIC_FACEBOOK_PIXEL=your-facebook-pixel-id
+# NEXT_PUBLIC_KAKAO_PIXEL=your-kakao-pixel-id
 ```
 
-### 2. Google Search Console 설정
+#### 서버 배포 환경 (`ecosystem.config.js`)
+
+PM2를 사용하는 경우 `ecosystem.config.js` 파일에 환경변수를 설정하세요:
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "chalpu-web",
+      script: "npm",
+      args: "start",
+      cwd: "./chalpu-web", // 실제 서버 경로로 수정
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3000,
+        // 사이트 기본 설정
+        NEXT_PUBLIC_SITE_URL: "https://www.chalpu.com",
+
+        // SEO 인증 키
+        GOOGLE_SITE_VERIFICATION: "FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ",
+        NAVER_SITE_VERIFICATION: "19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193",
+
+        // 분석 도구
+        NEXT_PUBLIC_GOOGLE_ANALYTICS: "G-4S4Y8G91RJ",
+      },
+    },
+  ],
+};
+```
+
+### 2. Google Search Console 설정 ✅ 완료
 
 1. [Google Search Console](https://search.google.com/search-console)에 사이트 등록
-2. 소유권 확인 (메타 태그 방식 사용)
-3. `GOOGLE_SITE_VERIFICATION` 환경 변수에 추가
+2. 소유권 확인 (메타 태그 방식 사용) ✅
+3. `GOOGLE_SITE_VERIFICATION` 환경 변수에 추가 ✅
+   - 확인 코드: `FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ`
 
-### 3. Google Analytics 설정
+### 3. Google Analytics 설정 ✅ 완료
 
-1. [Google Analytics](https://analytics.google.com)에서 속성 생성
-2. 측정 ID를 `NEXT_PUBLIC_GOOGLE_ANALYTICS`에 추가
+1. [Google Analytics](https://analytics.google.com)에서 속성 생성 ✅
+2. 측정 ID를 `NEXT_PUBLIC_GOOGLE_ANALYTICS`에 추가 ✅
+   - 측정 ID: `G-4S4Y8G91RJ`
 
-### 4. 네이버 웹마스터도구 설정
+### 4. 네이버 웹마스터도구 설정 ✅ 완료
 
-1. [네이버 웹마스터도구](https://searchadvisor.naver.com)에 사이트 등록
-2. 소유권 확인 코드를 `NAVER_SITE_VERIFICATION`에 추가
+1. [네이버 웹마스터도구](https://searchadvisor.naver.com)에 사이트 등록 ✅
+2. 소유권 확인 코드를 `NAVER_SITE_VERIFICATION`에 추가 ✅
+   - 확인 코드: `19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193`
 
 ## 📊 SEO 성과 측정
 
@@ -162,5 +205,30 @@ NEXT_PUBLIC_GOOGLE_TAG_MANAGER=GTM-XXXXXXX
 - [ ] 경쟁사 SEO 분석
 - [ ] 새로운 키워드 발굴
 - [ ] 구조화된 데이터 검증
+
+## 🎯 현재 설정 완료 상태
+
+### ✅ 완료된 설정
+
+- [x] **Google Search Console**: `FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ`
+- [x] **Google Analytics**: `G-4S4Y8G91RJ`
+- [x] **네이버 웹마스터도구**: `19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193`
+- [x] **도메인 통일**: www.chalpu.com으로 통일
+- [x] **환경변수 설정**: 로컬 및 서버 환경 모두 설정
+- [x] **PM2 설정**: ecosystem.config.js 완료
+
+### 📋 배포 후 확인 필요
+
+- [ ] **Google Search Console**: 확인 버튼 클릭 및 사이트맵 제출
+- [ ] **Google Analytics**: 실시간 데이터 수집 확인
+- [ ] **네이버 웹마스터도구**: 확인 버튼 클릭 및 사이트맵 제출
+- [ ] **실제 태그 확인**: 브라우저 개발자 도구에서 메타태그 확인
+
+### 🚀 다음 단계
+
+1. **서버 배포**: PM2 재시작으로 환경변수 적용
+2. **검색엔진 확인**: Google/네이버에서 소유권 확인
+3. **사이트맵 제출**: 검색엔진에 사이트 구조 알림
+4. **성과 모니터링**: 정기적인 SEO 성과 확인
 
 이 가이드를 통해 찰푸 웹사이트의 SEO 성과를 지속적으로 개선할 수 있습니다.
