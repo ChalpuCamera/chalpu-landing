@@ -1,4 +1,4 @@
-/* Google Fonts는 이제 Next.js에서 최적화하여 로드 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -35,44 +35,29 @@
     --ring: 217 91.2% 59.8%;
 
     --radius: 0.5rem;
-
-    /* 폰트 변수 정의 */
-    --font-noto: var(--font-noto-sans-kr);
   }
 
   * {
     @apply border-border;
-    /* 성능 최적화: 터치 하이라이트 제거 */
+    /* 웹뷰 최적화: 터치 타겟 크기 보장 */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
   }
 
   html {
-    /* 성능 최적화: 텍스트 크기 조정 방지 */
+    /* 웹뷰에서 확대/축소 방지 */
     -webkit-text-size-adjust: 100%;
     -ms-text-size-adjust: 100%;
-    /* 부드러운 스크롤 */
-    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-noto), "Noto Sans KR", -apple-system,
-      BlinkMacSystemFont, "Segoe UI", sans-serif;
-    /* 성능 최적화: 폰트 렌더링 최적화 */
+    @apply bg-background text-foreground font-sans;
+    font-family: "Noto Sans KR", sans-serif;
+    /* 웹뷰 최적화 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeSpeed;
-    /* 모바일 스크롤 최적화 */
+    /* 모바일에서 스크롤 부드럽게 */
     -webkit-overflow-scrolling: touch;
-    /* 레이아웃 시프트 방지 */
-    font-display: swap;
-  }
-
-  /* 성능 최적화: GPU 가속 활용 */
-  .gpu-accelerated {
-    transform: translateZ(0);
-    will-change: transform;
   }
 
   /* 웹뷰용 기본 컨테이너 */
@@ -102,25 +87,20 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4;
   }
 
-  /* 성능 최적화된 그라데이션 */
+  /* 랜딩 페이지용 기존 스타일 유지 (웹/앱 호환) */
   .gradient-bg {
     background: linear-gradient(135deg, #0066ff 0%, #00b8d9 100%);
-    /* GPU 가속 */
-    transform: translateZ(0);
   }
 
   .feature-card {
-    @apply bg-white p-6 rounded-xl shadow-lg hover:shadow-xl border border-gray-100;
-    transition: box-shadow 0.2s ease-in-out;
-    /* GPU 가속으로 애니메이션 최적화 */
-    will-change: box-shadow;
+    @apply bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col items-center border border-gray-100;
   }
 
   .section-padding {
     @apply py-16 md:py-24;
   }
 
-  /* 성능 최적화: 스크롤바 숨기기 */
+  /* 웹뷰에서 스크롤바 숨기기 */
   .webview-scrollbar-hidden {
     -ms-overflow-style: none;
     scrollbar-width: none;

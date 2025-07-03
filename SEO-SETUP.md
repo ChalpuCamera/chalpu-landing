@@ -47,6 +47,7 @@
 
 프로젝트 루트에 `.env.local` 파일을 생성하고 다음 내용을 추가하세요:
 
+```bash
 # 사이트 기본 설정
 NEXT_PUBLIC_SITE_URL=https://www.chalpu.com
 
@@ -61,7 +62,41 @@ NEXT_PUBLIC_GOOGLE_ANALYTICS=G-4S4Y8G91RJ
 # NEXT_PUBLIC_GOOGLE_TAG_MANAGER=GTM-XXXXXXX
 # NEXT_PUBLIC_FACEBOOK_PIXEL=your-facebook-pixel-id
 # NEXT_PUBLIC_KAKAO_PIXEL=your-kakao-pixel-id
+```
 
+#### 서버 배포 환경 (`ecosystem.config.js`)
+
+PM2를 사용하는 경우 `ecosystem.config.js` 파일에 환경변수를 설정하세요:
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "chalpu-web",
+      script: "npm",
+      args: "start",
+      cwd: "./chalpu-web", // 실제 서버 경로로 수정
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3000,
+        // 사이트 기본 설정
+        NEXT_PUBLIC_SITE_URL: "https://www.chalpu.com",
+
+        // SEO 인증 키
+        GOOGLE_SITE_VERIFICATION: "FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ",
+        NAVER_SITE_VERIFICATION: "19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193",
+
+        // 분석 도구
+        NEXT_PUBLIC_GOOGLE_ANALYTICS: "G-4S4Y8G91RJ",
+      },
+    },
+  ],
+};
+```
 
 ### 2. Google Search Console 설정 ✅ 완료
 

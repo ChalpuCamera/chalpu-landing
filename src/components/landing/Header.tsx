@@ -3,7 +3,7 @@ import CtaButton from "@/components/landing/CtaButton";
 
 const Header = () => {
   return (
-    <header className="text-black">
+    <header className=" text-black">
       <div className="container mx-auto px-4 py-16 md:py-20">
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div className="text-center md:text-left space-y-10">
@@ -29,13 +29,8 @@ const Header = () => {
                 alt="찰푸를 사용하여 촬영한 고품질 음식 사진 예시 - 플랫폼 승인 보장"
                 className="rounded-lg shadow-xl w-full max-h-96 object-cover"
                 priority
-                loading="eager"
                 width={1000}
                 height={600}
-                sizes="(max-width: 768px) 100vw, 50vw"
-                quality={85}
-                placeholder="blur"
-                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
               />
             </div>
           </div>
