@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import BrandHeader from "@/components/landing/BrandHeader";
 import Header from "@/components/landing/Header";
 import FeaturesSection from "@/components/landing/FeaturesSection";
-import TestimonialsSection from "@/components/landing/TestimonialsSection";
+import ReviewSection from "@/components/landing/ReviewSection";
 import FooterSection from "@/components/landing/FooterSection";
 import { Toaster as Sonner } from "@/components/landing/ui/sonner";
 
@@ -21,12 +22,17 @@ export const metadata: Metadata = {
     "음식 촬영",
     "상업 사진",
   ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
     description:
       "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
     type: "website",
+    locale: "ko_KR",
     url: "/",
+    siteName: "찰푸",
     images: [
       {
         url: "/og-image.jpg",
@@ -140,9 +146,10 @@ export default function Home() {
 
       <Sonner />
       <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+        <BrandHeader />
         <Header />
         <FeaturesSection />
-        <TestimonialsSection />
+        <ReviewSection />
         <FooterSection />
       </main>
     </>

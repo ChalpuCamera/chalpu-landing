@@ -1,13 +1,22 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/landing/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/landing/ui/dialog";
 import { Button } from "@/components/landing/ui/button";
 import { Input } from "@/components/landing/ui/input";
 import { Label } from "@/components/landing/ui/label";
 import { Checkbox } from "@/components/landing/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/landing/ui/radio-group";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/landing/ui/radio-group";
 import { Textarea } from "@/components/landing/ui/textarea";
 import { toast } from "sonner";
 import LegalInfoModal from "./LegalInfoModal";
+import { sendContact } from "@/app/services/apis/landing";
 
 interface CtaModalProps {
   isOpen: boolean;
@@ -20,13 +29,14 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
     phone: "",
     agreed: false,
     surveyAnswer: "",
-    otherAnswer: ""
+    otherAnswer: "",
   });
   const [showLegalInfo, setShowLegalInfo] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.email && !formData.phone) {
       toast.error("이메일 또는 전화번호 중 하나는 반드시 입력해주세요.");
       return;
@@ -47,18 +57,43 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
       return;
     }
 
-    console.log("Form submitted:", formData);
-    
-    toast.success("무료 체험 신청이 완료되었습니다.");
+    setIsLoading(true);
+    try {
+      // 이메일 또는 전화번호를 info로, 설문 응답을 message로 전송
+      const info = formData.email || formData.phone;
+      const message =
+        formData.surveyAnswer === "other"
+          ? formData.otherAnswer
+          : formData.surveyAnswer;
+      
+      // API 호출
+      await sendContact({
+        info,
+        message,
+      });
 
-    setFormData({
-      email: "",
-      phone: "",
-      agreed: false,
-      surveyAnswer: "",
-      otherAnswer: ""
-    });
-    onClose();
+      toast.success("무료 체험 신청이 완료되었습니다!", {
+        description: "빠른 시일 내에 연락드리겠습니다.",
+      });
+
+      setFormData({
+        email: "",
+        phone: "",
+        agreed: false,
+        surveyAnswer: "",
+        otherAnswer: "",
+      });
+      onClose();
+    } catch (error) {
+      console.error("무료 체험 신청 오류:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "신청 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -79,7 +114,13 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value, phone: ""})}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      email: e.target.value,
+                      phone: "",
+                    })
+                  }
                   placeholder="example@email.com"
                   disabled={!!formData.phone}
                 />
@@ -93,7 +134,13 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                   id="phone"
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value, email: ""})}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      phone: e.target.value,
+                      email: "",
+                    })
+                  }
                   placeholder="010-0000-0000"
                   disabled={!!formData.email}
                 />
@@ -101,21 +148,25 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
             </div>
 
             <div className="space-y-4">
-              <Label className="text-base font-semibold">현재 사진 업로드에서 가장 불편한 점은 무엇인가요?</Label>
-              <RadioGroup 
-                value={formData.surveyAnswer} 
-                onValueChange={(value: string) => setFormData({...formData, surveyAnswer: value})}
+              <Label className="text-base font-semibold">
+                현재 사진 업로드에서 가장 불편한 점은 무엇인가요?
+              </Label>
+              <RadioGroup
+                value={formData.surveyAnswer}
+                onValueChange={(value: string) =>
+                  setFormData({ ...formData, surveyAnswer: value })
+                }
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="rejected" id="rejected" />
+                  <RadioGroupItem value="자주 반려됨" id="rejected" />
                   <Label htmlFor="rejected">자주 반려됨</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="quality" id="quality" />
+                  <RadioGroupItem value="사진이 잘 안 나옴" id="quality" />
                   <Label htmlFor="quality">사진이 잘 안 나옴</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="guidelines" id="guidelines" />
+                  <RadioGroupItem value="가이드라인이 어려움" id="guidelines" />
                   <Label htmlFor="guidelines">가이드라인이 어려움</Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -128,7 +179,9 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                 <Textarea
                   placeholder="기타 불편한 점을 입력해주세요"
                   value={formData.otherAnswer}
-                  onChange={(e) => setFormData({...formData, otherAnswer: e.target.value})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, otherAnswer: e.target.value })
+                  }
                 />
               )}
             </div>
@@ -138,7 +191,9 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                 <Checkbox
                   id="privacy"
                   checked={formData.agreed}
-                  onCheckedChange={(checked) => setFormData({...formData, agreed: checked as boolean})}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, agreed: checked as boolean })
+                  }
                 />
                 <div className="text-sm">
                   <Label htmlFor="privacy" className="font-medium">
@@ -149,26 +204,27 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                     onClick={() => setShowLegalInfo(true)}
                     className="text-blue-600 hover:underline ml-2"
                   >
-                    더 자세한 법적 정보
+                    개인정보 처리 안내
                   </button>
                 </div>
               </div>
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               size="lg"
+              disabled={isLoading}
             >
-              무료 체험 신청하기
+              {isLoading ? "신청 중..." : "무료 체험 신청하기"}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      <LegalInfoModal 
-        isOpen={showLegalInfo} 
-        onClose={() => setShowLegalInfo(false)} 
+      <LegalInfoModal
+        isOpen={showLegalInfo}
+        onClose={() => setShowLegalInfo(false)}
       />
     </>
   );
