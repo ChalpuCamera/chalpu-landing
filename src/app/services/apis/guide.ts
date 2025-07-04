@@ -1,4 +1,23 @@
 import apiClient from "./base";
+
+// 어드민 토큰을 헤더에 포함하는 헬퍼 함수
+const getAdminHeaders = () => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (typeof window !== "undefined") {
+    const adminToken = localStorage.getItem("admin_auth_token");
+    if (adminToken) {
+      const bearerToken = adminToken.startsWith("Bearer ")
+        ? adminToken
+        : `Bearer ${adminToken}`;
+      headers.Authorization = bearerToken;
+    }
+  }
+
+  return headers;
+};
 import {
   Guide,
   GuidePresignedUrlRequest,
@@ -30,7 +49,8 @@ export const getGuides = async (
   }
 
   const response = await apiClient.get<GuideApiResponse<GuideListResponse>>(
-    `/api/guides?${params.toString()}`
+    `/api/guides?${params.toString()}`,
+    { headers: getAdminHeaders() }
   );
   return response.data.result;
 };
@@ -42,7 +62,8 @@ export const getGuide = async (
   guideId: number
 ): Promise<GuideDetailResponse> => {
   const response = await apiClient.get<GuideApiResponse<GuideDetailResponse>>(
-    `/api/guides/${guideId}`
+    `/api/guides/${guideId}`,
+    { headers: getAdminHeaders() }
   );
   return response.data.result;
 };
@@ -57,7 +78,7 @@ export const getGuidePresignedUrl = async (
 
   const response = await apiClient.post<
     GuideApiResponse<GuidePresignedUrlResponse>
-  >("/api/guides/presigned-url", request);
+  >("/api/guides/presigned-url", request, { headers: getAdminHeaders() });
   return response.data.result;
 };
 
@@ -82,19 +103,13 @@ export const uploadGuideToS3 = async (
     const xmlContent = await file.text();
     console.log("📝 XML 내용 미리보기:", xmlContent.substring(0, 200) + "...");
 
-    // 2. S3에 XML 원본 데이터 업로드
+    // 2. S3에 XML 원본 데이터 업로드 (Authorization 헤더 없이)
     await apiClient.put(presignedUrl, xmlContent, {
       headers: {
         "Content-Type": "application/xml",
+        // S3에는 Authorization 헤더 불필요하므로 명시적으로 제거
+        Authorization: undefined,
       },
-      // Authorization 헤더 완전 제거
-      transformRequest: [
-        (data, headers) => {
-          // Authorization 헤더 삭제
-          delete headers.Authorization;
-          return data;
-        },
-      ],
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && onProgress) {
           const progress: GuideUploadProgress = {
@@ -131,7 +146,7 @@ export const registerGuide = async (
 
   const response = await apiClient.post<
     GuideApiResponse<GuideRegisterResponse>
-  >("/api/guides/register", request);
+  >("/api/guides/register", request, { headers: getAdminHeaders() });
   return response.data.result;
 };
 
@@ -140,7 +155,8 @@ export const registerGuide = async (
  */
 export const deleteGuide = async (guideId: number): Promise<void> => {
   await apiClient.delete<GuideApiResponse<GuideDeleteResponse>>(
-    `/api/guides/${guideId}`
+    `/api/guides/${guideId}`,
+    { headers: getAdminHeaders() }
   );
 };
 
