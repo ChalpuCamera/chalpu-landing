@@ -92,25 +92,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
-  // 리다이렉트 설정 (필요시)
-  async redirects() {
-    return [
-      // www 없는 도메인을 www 있는 도메인으로 리다이렉트
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "chalpu.com",
-          },
-        ],
-        destination: "https://www.chalpu.com/:path*",
-        permanent: true,
-      },
-    ];
-  },
-
+  
   // 웹팩 최적화
   webpack: (config, { dev, isServer }) => {
     // 개발 모드에서는 기본 설정 사용 (MIME type 문제 방지)
