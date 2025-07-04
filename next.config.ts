@@ -113,16 +113,27 @@ const nextConfig: NextConfig = {
 
   // 웹팩 최적화
   webpack: (config, { dev, isServer }) => {
-    // 번들 크기 최적화
+    // 개발 모드에서는 기본 설정 사용 (MIME type 문제 방지)
+    if (dev) {
+      return config;
+    }
+
+    // 프로덕션에서만 번들 최적화 적용
     config.optimization = {
       ...config.optimization,
       splitChunks: {
         chunks: "all",
         cacheGroups: {
           vendor: {
-            test: /[\\/]node_modules[\\/]/,
+            test: /[\\/]node_modules[\\/].*\.js$/,
             name: "vendors",
             chunks: "all",
+          },
+          styles: {
+            test: /\.css$/,
+            name: "styles",
+            chunks: "all",
+            enforce: true,
           },
           common: {
             name: "common",

@@ -25,23 +25,12 @@ function LoadingFallback() {
 }
 
 export const metadata: Metadata = {
+  // 페이지별 타이틀 템플릿 설정
   title: {
-    default: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
     template: "%s | 찰푸",
+    default: "찰푸",
   },
-  description:
-    "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
-  keywords: [
-    "음식사진",
-    "소상공인",
-    "사진업로드",
-    "배달앱",
-    "네이버플레이스",
-    "AI보정",
-    "사진가이드",
-    "매출증대",
-    "플랫폼최적화",
-  ],
+  // 사이트 전체 공통 설정
   authors: [{ name: "찰푸 팀" }],
   creator: "찰푸",
   publisher: "찰푸",
@@ -53,33 +42,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL || "https://www.chalpu.com"
   ),
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    type: "website",
-    locale: "ko_KR",
-    url: "/",
-    title: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
-    description:
-      "플랫폼 사진 반려 걱정 없이! 배달앱, 네이버 플레이스 등 각 플랫폼에 최적화된 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
-    siteName: "찰푸",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "찰푸 - 소상공인을 위한 사진 업로드 솔루션",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "찰푸 | 소상공인을 위한 사진 업로드 솔루션",
-    description:
-      "플랫폼 사진 반려 걱정 없이! 음식 사진 가이드라인과 자동 보정으로 매출 증대를 경험하세요.",
-    images: ["/og-image.jpg"],
-  },
+  // 검색엔진 설정
   robots: {
     index: true,
     follow: true,
@@ -91,6 +54,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  // 사이트 인증
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     other: {
@@ -119,6 +83,17 @@ export default function RootLayout({
           rel="preconnect"
           href="https://fonts.gstatic.com"
           crossOrigin=""
+        />
+
+        {/* Instant favicon (inline data URI) - 404 에러 없이 즉시 로딩 */}
+        <link
+          rel="icon"
+          href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzNCODJGNiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjIxIiB5PSI5IiB3aWR0aD0iMyIgaGVpZ2h0PSIyIiByeD0iMSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPiA="
+          type="image/svg+xml"
+        />
+        <link
+          rel="shortcut icon"
+          href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzNCODJGNiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjIxIiB5PSI5IiB3aWR0aD0iMyIgaGVpZ2h0PSIyIiByeD0iMSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPiA="
         />
 
         {/* 환경변수 적용 안될 때 사용 */}

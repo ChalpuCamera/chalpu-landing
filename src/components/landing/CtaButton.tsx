@@ -11,7 +11,7 @@ export default function CtaButton() {
     <>
       <Button
         onClick={() => setIsModalOpen(true)}
-        className="bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 text-white px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="h-14 bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 text-white px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         aria-label="찰푸 무료 체험 신청하기"
       >
         선착순 무료 체험 신청하기
