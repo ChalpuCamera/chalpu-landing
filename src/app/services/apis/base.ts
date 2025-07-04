@@ -17,13 +17,18 @@ const apiClient = axios.create({
   },
 });
 
-// 요청 인터셉터
+// 요청 인터셉터 (일반 앱 토큰만 처리)
 apiClient.interceptors.request.use(
   (config) => {
-    // 토큰이 있는 경우 헤더에 추가
+    // 일반 앱 토큰만 확인
     const token = tokenStorage.getToken("accessToken");
+
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Bearer 접두사가 이미 있는지 확인
+      const bearerToken = token.startsWith("Bearer ")
+        ? token
+        : `Bearer ${token}`;
+      config.headers.Authorization = bearerToken;
     }
 
     console.log("API 요청:", config.method?.toUpperCase(), config.url);
@@ -77,9 +82,10 @@ apiClient.interceptors.response.use(
         // 네이티브 앱에게 토큰 만료 알림
         notifyTokenExpired();
 
-        // 웹뷰가 아닌 경우에만 로그인 페이지로 리다이렉트
+        // 웹뷰가 아닌 경우에만 메인 페이지로 리다이렉트 (무한루프 방지)
         if (typeof window !== "undefined" && !isWebView()) {
-          window.location.href = "/login";
+          console.log("인증 에러 발생 - 메인 페이지로 리다이렉트");
+          window.location.href = "/";
         }
       }
     }
