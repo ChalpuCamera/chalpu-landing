@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60 * 60 * 24 * 7, // 7일 캐시
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+
+    // 외부 이미지 도메인 추가
     remotePatterns: [
       {
         protocol: "https",
@@ -71,8 +73,7 @@ const nextConfig: NextConfig = {
       },
       // 정적 자산 캐싱
       {
-        source:
-          "/(_next/static|robots.txt|sitemap.xml|manifest.webmanifest|favicon.ico)",
+        source: "/(_next/static|robots.txt|sitemap.xml|favicon.ico)",
         headers: [
           {
             key: "Cache-Control",
@@ -92,7 +93,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
+
   // 웹팩 최적화
   webpack: (config, { dev, isServer }) => {
     // 개발 모드에서는 기본 설정 사용 (MIME type 문제 방지)
