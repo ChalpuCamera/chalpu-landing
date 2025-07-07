@@ -26,6 +26,7 @@ import {
   GuideRegisterResponse,
   GuideListResponse,
   GuideDetailResponse,
+  GuideDeleteRequest,
   GuideDeleteResponse,
   GuideApiResponse,
   Pageable,
@@ -78,12 +79,12 @@ export const getGuidePresignedUrl = async (
 
   const response = await apiClient.post<
     GuideApiResponse<GuidePresignedUrlResponse>
-  >("/api/guides/presigned-url", request, { headers: getAdminHeaders() });
+  >("/api/guides/presigned-urls", request, { headers: getAdminHeaders() });
   return response.data.result;
 };
 
 /**
- * S3에 가이드 파일 직접 업로드 (XML 원본 데이터 전송)
+ * S3에 파일 직접 업로드 (이미지 또는 XML 파일)
  */
 export const uploadGuideToS3 = async (
   presignedUrl: string,
@@ -98,15 +99,35 @@ export const uploadGuideToS3 = async (
   });
 
   try {
-    // 1. XML 파일의 원본 데이터를 텍스트로 읽기
-    console.log("📖 XML 파일 원본 데이터 읽는 중...");
-    const xmlContent = await file.text();
-    console.log("📝 XML 내용 미리보기:", xmlContent.substring(0, 200) + "...");
+    const isImageFile = file.type.startsWith("image/");
+    const isXmlFile =
+      file.type === "application/xml" || file.name.endsWith(".xml");
 
-    // 2. S3에 XML 원본 데이터 업로드 (Authorization 헤더 없이)
-    await apiClient.put(presignedUrl, xmlContent, {
+    let uploadData: string | File;
+    let contentType: string;
+
+    if (isXmlFile) {
+      // XML 파일의 경우 텍스트로 읽어서 업로드
+      console.log("📖 XML 파일 원본 데이터 읽는 중...");
+      uploadData = await file.text();
+      contentType = "application/xml";
+      console.log(
+        "📝 XML 내용 미리보기:",
+        uploadData.substring(0, 200) + "..."
+      );
+    } else if (isImageFile) {
+      // 이미지 파일의 경우 바이너리 데이터 그대로 업로드
+      console.log("📷 이미지 파일 업로드 중...");
+      uploadData = file;
+      contentType = file.type;
+    } else {
+      throw new Error(`지원하지 않는 파일 타입: ${file.type}`);
+    }
+
+    // S3에 파일 업로드 (Authorization 헤더 없이)
+    await apiClient.put(presignedUrl, uploadData, {
       headers: {
-        "Content-Type": "application/xml",
+        "Content-Type": contentType,
         // S3에는 Authorization 헤더 불필요하므로 명시적으로 제거
         Authorization: undefined,
       },
@@ -139,81 +160,95 @@ export const uploadGuideToS3 = async (
  * 가이드 정보 등록 (Admin) - S3 업로드 완료 후 호출
  */
 export const registerGuide = async (
-  s3Key: string,
-  fileName: string
+  guideS3Key: string,
+  fileName: string,
+  imageS3Key: string,
+  subCategoryId: number,
+  content?: string,
+  tags?: string[]
 ): Promise<GuideRegisterResponse> => {
-  const request: GuideRegisterRequest = { s3Key, fileName };
+  const request: GuideRegisterRequest = {
+    guideS3Key,
+    fileName,
+    imageS3Key,
+    subCategoryId,
+    content,
+    tags,
+  };
 
   const response = await apiClient.post<
     GuideApiResponse<GuideRegisterResponse>
-  >("/api/guides/register", request, { headers: getAdminHeaders() });
+  >("/api/guides", request, { headers: getAdminHeaders() });
   return response.data.result;
 };
 
 /**
- * 가이드 삭제 (Admin)
+ * 가이드 다중 삭제 (Admin)
  */
-export const deleteGuide = async (guideId: number): Promise<void> => {
-  await apiClient.delete<GuideApiResponse<GuideDeleteResponse>>(
-    `/api/guides/${guideId}`,
-    { headers: getAdminHeaders() }
-  );
+export const deleteGuides = async (guideIds: number[]): Promise<void> => {
+  const request: GuideDeleteRequest = { guideIds };
+
+  await apiClient.delete<GuideApiResponse<GuideDeleteResponse>>(`/api/guides`, {
+    headers: getAdminHeaders(),
+    data: request,
+  });
 };
 
 /**
- * 가이드 파일 전체 업로드 프로세스 (통합 함수)
+ * 가이드 파일 쌍 전체 업로드 프로세스 (통합 함수)
  * 1. Presigned URL 생성
- * 2. S3에 파일 업로드
+ * 2. S3에 이미지와 XML 파일 업로드
  * 3. 서버에 메타데이터 등록
  */
-export const uploadGuide = async (
-  file: File,
+export const uploadGuidePair = async (
+  imageFile: File,
+  xmlFile: File,
+  fileName: string,
+  subCategoryId: number,
+  content?: string,
+  tags?: string[],
   onProgress?: (progress: number) => void
 ): Promise<Guide> => {
   try {
     // 1. Presigned URL 생성
-    const { presignedUrl, s3Key } = await getGuidePresignedUrl(file.name);
+    const { guideUploadUrl, guideS3Key, imageUploadUrl, imageS3Key } =
+      await getGuidePresignedUrl(fileName);
 
-    // 2. S3에 파일 업로드
-    await uploadGuideToS3(presignedUrl, file, (progress) => {
+    // 2. 이미지 파일 S3에 업로드
+    await uploadGuideToS3(imageUploadUrl, imageFile, (progress) => {
       if (onProgress) {
-        onProgress(progress.percentage);
+        onProgress(progress.percentage * 0.4); // 40%까지
       }
     });
 
-    // 3. 서버에 메타데이터 등록
-    const guide = await registerGuide(s3Key, file.name);
+    // 3. XML 파일 S3에 업로드
+    await uploadGuideToS3(guideUploadUrl, xmlFile, (progress) => {
+      if (onProgress) {
+        onProgress(40 + progress.percentage * 0.4); // 40%~80%
+      }
+    });
+
+    // 4. 서버에 메타데이터 등록
+    if (onProgress) {
+      onProgress(80); // 80%
+    }
+
+    const guide = await registerGuide(
+      guideS3Key,
+      fileName,
+      imageS3Key,
+      subCategoryId,
+      content,
+      tags
+    );
+
+    if (onProgress) {
+      onProgress(100); // 100%
+    }
 
     return guide;
   } catch (error) {
-    console.error("Guide upload failed:", error);
+    console.error("Guide pair upload failed:", error);
     throw error;
   }
-};
-
-/**
- * 여러 가이드 파일 동시 업로드
- */
-export const uploadMultipleGuides = async (
-  files: File[],
-  onProgress?: (fileIndex: number, progress: number) => void
-): Promise<Guide[]> => {
-  const results: Guide[] = [];
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    try {
-      const guide = await uploadGuide(file, (progress) => {
-        if (onProgress) {
-          onProgress(i, progress);
-        }
-      });
-      results.push(guide);
-    } catch (error) {
-      console.error(`Failed to upload ${file.name}:`, error);
-      throw error;
-    }
-  }
-
-  return results;
 };
