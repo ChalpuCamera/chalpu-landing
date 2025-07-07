@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "images.unsplash.com",
+        hostname: "cdn.chalpu.com",
         port: "",
         pathname: "/**",
       },
