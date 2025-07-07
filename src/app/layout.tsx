@@ -72,11 +72,6 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        {/* DNS prefetch for external resources */}
-        <link rel="dns-prefetch" href="//fonts.googleapis.com" />
-        <link rel="dns-prefetch" href="//images.unsplash.com" />
-        <link rel="dns-prefetch" href="//www.googletagmanager.com" />
-
         {/* Preconnect for critical resources */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -84,6 +79,10 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
+        <link rel="preconnect" href="https://cdn.chalpu.com" />
+
+        {/* DNS prefetch for non-critical resources */}
+        <link rel="dns-prefetch" href="//www.googletagmanager.com" />
 
         {/* Instant favicon (inline data URI) - 404 에러 없이 즉시 로딩 */}
         <link

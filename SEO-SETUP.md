@@ -52,7 +52,7 @@ NEXT_PUBLIC_SITE_URL=https://www.chalpu.com
 
 # SEO 인증 키
 GOOGLE_SITE_VERIFICATION=FpySdiv9_TbkjVCcZC3EQguW2k19ARaj6CnhPyvZnxQ
-NAVER_SITE_VERIFICATION=19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193
+NAVER_SITE_VERIFICATION=8ae45325b60de76c86e972306aa514552194b9fc
 
 # 분석 도구
 NEXT_PUBLIC_GOOGLE_ANALYTICS=G-4S4Y8G91RJ
@@ -80,7 +80,7 @@ NEXT_PUBLIC_GOOGLE_ANALYTICS=G-4S4Y8G91RJ
 
 1. [네이버 웹마스터도구](https://searchadvisor.naver.com)에 사이트 등록 ✅
 2. 소유권 확인 코드를 `NAVER_SITE_VERIFICATION`에 추가 ✅
-   - 확인 코드: `19ab39ad9f4fe8aadec8e57ac82d4ea49ab89193`
+   - 확인 코드: `8ae45325b60de76c86e972306aa514552194b9fc`
 
 ## 📊 SEO 성과 측정
 
