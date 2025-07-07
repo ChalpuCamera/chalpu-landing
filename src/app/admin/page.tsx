@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getGuides, deleteGuide, uploadGuide } from "@/app/services/apis/guide";
-import { Guide, GuideFileUploadItem } from "@/app/services/types/guide";
+import {
+  getGuides,
+  deleteGuide,
+  uploadGuide,
+  getGuidePresignedUrl,
+  uploadGuideToS3,
+} from "@/app/services/apis/guide";
+import { Guide } from "@/app/services/types/guide";
 import { toast } from "sonner";
 import { Button } from "@/components/landing/ui/button";
 import {
@@ -14,14 +20,12 @@ import {
 } from "@/components/landing/ui/card";
 import { Input } from "@/components/landing/ui/input";
 import { Label } from "@/components/landing/ui/label";
+import Image from "next/image";
 
 export default function AdminPage() {
   const [mounted, setMounted] = useState(false);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadItems, setUploadItems] = useState<GuideFileUploadItem[]>([]);
-  const [dragOver, setDragOver] = useState(false);
 
   // 토큰 관리 상태
   const [authToken, setAuthToken] = useState("");
@@ -32,6 +36,33 @@ export default function AdminPage() {
 
   // 뷰 모드 상태 (그리드/리스트)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // 파일 쌍 업로드 관련 상태
+  interface FileUploadPair {
+    id: string;
+    imageFile: File | null;
+    xmlFile: File | null;
+    fileName: string;
+    uploading: boolean;
+    progress: number;
+    error: string | null;
+    completed: boolean;
+    nameMatchError: boolean;
+  }
+
+  const [uploadPairs, setUploadPairs] = useState<FileUploadPair[]>([
+    {
+      id: "pair-1",
+      imageFile: null,
+      xmlFile: null,
+      fileName: "",
+      uploading: false,
+      progress: 0,
+      error: null,
+      completed: false,
+      nameMatchError: false,
+    },
+  ]);
 
   // 클라이언트에서만 렌더링하도록 설정
   useEffect(() => {
@@ -124,86 +155,226 @@ export default function AdminPage() {
     }
   }, [mounted, authToken, loadGuides]);
 
-  // 파일 업로드 처리
-  const handleFileUpload = async (files: FileList) => {
-    if (!authToken) {
-      toast.error("먼저 인증 토큰을 설정해주세요.");
-      return;
-    }
+  // 새 파일 쌍 추가
+  const addNewPair = () => {
+    const newPair: FileUploadPair = {
+      id: `pair-${Date.now()}`,
+      imageFile: null,
+      xmlFile: null,
+      fileName: "",
+      uploading: false,
+      progress: 0,
+      error: null,
+      completed: false,
+      nameMatchError: false,
+    };
+    setUploadPairs((prev) => [...prev, newPair]);
+  };
 
-    const fileArray = Array.from(files);
+  // 파일 쌍 제거
+  const removePair = (id: string) => {
+    setUploadPairs((prev) => prev.filter((pair) => pair.id !== id));
+  };
 
-    // XML 파일만 허용
-    const validFiles = fileArray.filter(
-      (file) =>
-        file.type.includes("xml") || file.name.toLowerCase().endsWith(".xml")
-    );
+  // 파일명 매칭 검증 함수
+  const validateFileNameMatch = (
+    imageFile: File | null,
+    xmlFile: File | null
+  ) => {
+    if (!imageFile || !xmlFile) return { isValid: true, fileName: "" };
 
-    if (validFiles.length !== fileArray.length) {
-      toast.error("XML 파일만 업로드할 수 있습니다.");
-    }
+    const imageName = imageFile.name.replace(/\.(png|jpg|jpeg)$/i, "");
+    const xmlName = xmlFile.name.replace(/\.xml$/i, "");
 
-    if (validFiles.length === 0) return;
+    return {
+      isValid: imageName === xmlName,
+      fileName: imageName === xmlName ? imageName : "",
+    };
+  };
 
-    // 업로드 아이템 생성 (클라이언트에서만 실행되므로 안전)
-    const newUploadItems: GuideFileUploadItem[] = validFiles.map(
-      (file, index) => ({
-        id: `upload-${Date.now()}-${index}-${Math.random()
-          .toString(36)
-          .substring(2)}`,
-        file,
-        progress: 0,
-        status: "pending",
+  // 이미지 파일 선택
+  const handleImageSelect = (pairId: string, file: File) => {
+    setUploadPairs((prev) =>
+      prev.map((pair) => {
+        if (pair.id === pairId) {
+          const validation = validateFileNameMatch(file, pair.xmlFile);
+          return {
+            ...pair,
+            imageFile: file,
+            fileName: validation.fileName,
+            nameMatchError: !validation.isValid,
+          };
+        }
+        return pair;
       })
     );
+  };
 
-    setUploadItems((prev) => [...prev, ...newUploadItems]);
-    setUploading(true);
+  // XML 파일 선택
+  const handleXmlSelect = (pairId: string, file: File) => {
+    setUploadPairs((prev) =>
+      prev.map((pair) => {
+        if (pair.id === pairId) {
+          const validation = validateFileNameMatch(pair.imageFile, file);
+          return {
+            ...pair,
+            xmlFile: file,
+            fileName: validation.fileName,
+            nameMatchError: !validation.isValid,
+          };
+        }
+        return pair;
+      })
+    );
+  };
 
-    // 파일 업로드 실행
-    for (const item of newUploadItems) {
-      try {
-        // 상태 업데이트: 업로드 시작
-        setUploadItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? { ...i, status: "uploading" } : i
-          )
-        );
+  // 이미지 파일 제거
+  const removeImageFile = (pairId: string) => {
+    setUploadPairs((prev) =>
+      prev.map((pair) => {
+        if (pair.id === pairId) {
+          // XML 파일이 있으면 XML 파일명으로, 없으면 빈 문자열
+          const fileName = pair.xmlFile
+            ? pair.xmlFile.name.replace(/\.xml$/i, "")
+            : "";
+          return {
+            ...pair,
+            imageFile: null,
+            fileName,
+            nameMatchError: false, // 파일이 하나만 있을 때는 에러 없음
+          };
+        }
+        return pair;
+      })
+    );
+    // 파일 input 초기화
+    const input = document.getElementById(
+      `image-${pairId}`
+    ) as HTMLInputElement;
+    if (input) input.value = "";
+  };
 
-        // 파일 업로드
-        const guide = await uploadGuide(item.file, (progress) => {
-          setUploadItems((prev) =>
-            prev.map((i) => (i.id === item.id ? { ...i, progress } : i))
-          );
-        });
+  // XML 파일 제거
+  const removeXmlFile = (pairId: string) => {
+    setUploadPairs((prev) =>
+      prev.map((pair) => {
+        if (pair.id === pairId) {
+          // 이미지 파일이 있으면 이미지 파일명으로, 없으면 빈 문자열
+          const fileName = pair.imageFile
+            ? pair.imageFile.name.replace(/\.(png|jpg|jpeg)$/i, "")
+            : "";
+          return {
+            ...pair,
+            xmlFile: null,
+            fileName,
+            nameMatchError: false, // 파일이 하나만 있을 때는 에러 없음
+          };
+        }
+        return pair;
+      })
+    );
+    // 파일 input 초기화
+    const input = document.getElementById(`xml-${pairId}`) as HTMLInputElement;
+    if (input) input.value = "";
+  };
 
-        // 상태 업데이트: 업로드 완료
-        setUploadItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? { ...i, status: "completed", guide } : i
-          )
-        );
+  // 개별 파일 쌍 업로드
+  const uploadPair = async (pair: FileUploadPair) => {
+    if (!pair.imageFile || !pair.xmlFile || !authToken) return;
 
-        toast.success(`${item.file.name} 업로드 완료`);
-      } catch (error) {
-        console.error(`Upload failed for ${item.file.name}:`, error);
-        setUploadItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id
-              ? {
-                  ...i,
-                  status: "error",
-                  error: error instanceof Error ? error.message : "업로드 실패",
-                }
-              : i
-          )
-        );
-        toast.error(`${item.file.name} 업로드 실패`);
-      }
+    setUploadPairs((prev) =>
+      prev.map((p) =>
+        p.id === pair.id
+          ? { ...p, uploading: true, progress: 0, error: null }
+          : p
+      )
+    );
+
+    try {
+      // 1. 이미지 파일 업로드
+      const imageExt = pair.imageFile.name.split(".").pop();
+      const imagePresigned = await getGuidePresignedUrl(
+        `${pair.fileName}.${imageExt}`
+      );
+
+      setUploadPairs((prev) =>
+        prev.map((p) => (p.id === pair.id ? { ...p, progress: 25 } : p))
+      );
+
+      await uploadGuideToS3(imagePresigned.presignedUrl, pair.imageFile);
+
+      // 2. XML 파일 업로드
+      const xmlPresigned = await getGuidePresignedUrl(`${pair.fileName}.xml`);
+
+      setUploadPairs((prev) =>
+        prev.map((p) => (p.id === pair.id ? { ...p, progress: 50 } : p))
+      );
+
+      await uploadGuideToS3(xmlPresigned.presignedUrl, pair.xmlFile);
+
+      // 3. 서버에 메타데이터 등록
+      setUploadPairs((prev) =>
+        prev.map((p) => (p.id === pair.id ? { ...p, progress: 75 } : p))
+      );
+
+      const response = await fetch("/api/guides/register-pair", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authToken.startsWith("Bearer ")
+            ? authToken
+            : `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          fileName: pair.fileName,
+          imageS3Key: imagePresigned.s3Key,
+          xmlS3Key: xmlPresigned.s3Key,
+        }),
+      });
+
+      if (!response.ok) throw new Error("서버 등록 실패");
+
+      setUploadPairs((prev) =>
+        prev.map((p) =>
+          p.id === pair.id
+            ? { ...p, progress: 100, completed: true, uploading: false }
+            : p
+        )
+      );
+
+      toast.success(`${pair.fileName} 업로드 완료`);
+    } catch (error) {
+      console.error("업로드 실패:", error);
+      setUploadPairs((prev) =>
+        prev.map((p) =>
+          p.id === pair.id
+            ? {
+                ...p,
+                uploading: false,
+                error: error instanceof Error ? error.message : "업로드 실패",
+              }
+            : p
+        )
+      );
+      toast.error(`${pair.fileName} 업로드 실패`);
+    }
+  };
+
+  // 전체 업로드
+  const uploadAll = async () => {
+    const validPairs = uploadPairs.filter(
+      (pair) =>
+        pair.imageFile &&
+        pair.xmlFile &&
+        !pair.completed &&
+        !pair.nameMatchError
+    );
+
+    for (const pair of validPairs) {
+      await uploadPair(pair);
     }
 
-    setUploading(false);
-    // 업로드 완료 후 목록 새로고침
+    // 업로드 완료 후 가이드 목록 새로고침
     loadGuides();
   };
 
@@ -226,38 +397,6 @@ export default function AdminPage() {
       console.error("Failed to delete guide:", error);
       toast.error("가이드 삭제에 실패했습니다.");
     }
-  };
-
-  // 드래그 앤 드롭 이벤트 처리
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-
-    if (e.dataTransfer.files) {
-      handleFileUpload(e.dataTransfer.files);
-    }
-  };
-
-  // 파일 입력 처리
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFileUpload(e.target.files);
-    }
-  };
-
-  // 업로드 아이템 제거
-  const removeUploadItem = (id: string) => {
-    setUploadItems((prev) => prev.filter((item) => item.id !== id));
   };
 
   // 토큰 상태에 따른 색상
@@ -379,117 +518,262 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle>파일 업로드</CardTitle>
             <CardDescription>
-              XML 가이드 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.
+              이미지(PNG/JPG)와 XML 파일을 쌍으로 업로드하세요. 파일 이름은
+              동일해야 합니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragOver
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                multiple
-                accept=".xml,application/xml,text/xml"
-                onChange={handleFileInput}
-                className="hidden"
-                id="file-upload"
-                disabled={!authToken}
-              />
-              <label htmlFor="file-upload" className="cursor-pointer block">
-                <div className="mb-4">
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    stroke="currentColor"
-                    fill="none"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div className="text-lg font-medium text-gray-900 mb-2">
-                  파일을 여기로 드래그하거나 클릭하여 업로드
-                </div>
-                <div className="text-sm text-gray-500">
-                  XML 파일만 지원됩니다 (최대 10MB)
-                </div>
-              </label>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 업로드 진행률 */}
-        {uploadItems.length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>업로드 진행 상황</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {uploadItems.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-4">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-900">
-                          {item.file.name}
+            <div className="space-y-6">
+              {uploadPairs.map((pair, index) => (
+                <div key={pair.id} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium text-gray-900">
+                      파일 쌍 {index + 1}
+                      {pair.fileName && (
+                        <span className="ml-2 text-sm text-gray-600">
+                          ({pair.fileName})
                         </span>
-                        <span className="text-sm text-gray-500">
-                          {item.status === "completed"
-                            ? "완료"
-                            : item.status === "error"
-                            ? "오류"
-                            : item.status === "uploading"
-                            ? `${item.progress}%`
-                            : "대기"}
+                      )}
+                    </h3>
+                    {uploadPairs.length > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removePair(pair.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        제거
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 이미지 파일 선택 */}
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`image-${pair.id}`}
+                        className="text-sm font-medium"
+                      >
+                        이미지 파일 (PNG/JPG)
+                      </Label>
+                      <div className="relative">
+                        <input
+                          id={`image-${pair.id}`}
+                          type="file"
+                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageSelect(pair.id, file);
+                          }}
+                          className="w-full p-2 border rounded-md text-sm"
+                          disabled={pair.uploading || pair.completed}
+                        />
+                        {pair.imageFile && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm flex items-center justify-between">
+                            <span className="text-blue-700">
+                              ✓ {pair.imageFile.name}
+                            </span>
+                            <button
+                              onClick={() => removeImageFile(pair.id)}
+                              disabled={pair.uploading || pair.completed}
+                              className="text-red-500 hover:text-red-700 ml-2 disabled:opacity-50"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* XML 파일 선택 */}
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`xml-${pair.id}`}
+                        className="text-sm font-medium"
+                      >
+                        XML 파일
+                      </Label>
+                      <div className="relative">
+                        <input
+                          id={`xml-${pair.id}`}
+                          type="file"
+                          accept=".xml,application/xml,text/xml"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleXmlSelect(pair.id, file);
+                          }}
+                          className="w-full p-2 border rounded-md text-sm"
+                          disabled={pair.uploading || pair.completed}
+                        />
+                        {pair.xmlFile && (
+                          <div className="mt-2 p-2 bg-green-50 rounded text-sm flex items-center justify-between">
+                            <span className="text-green-700">
+                              ✓ {pair.xmlFile.name}
+                            </span>
+                            <button
+                              onClick={() => removeXmlFile(pair.id)}
+                              disabled={pair.uploading || pair.completed}
+                              className="text-red-500 hover:text-red-700 ml-2 disabled:opacity-50"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 파일명 불일치 에러 메시지 */}
+                  {pair.nameMatchError && (
+                    <div className="mt-4 p-3 bg-orange-50 rounded-md">
+                      <div className="flex items-center text-orange-700">
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        파일명이 일치하지 않습니다. 이미지와 XML 파일의
+                        이름(확장자 제외)이 동일해야 합니다.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 업로드 상태 */}
+                  {pair.uploading && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">
+                          업로드 중...
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {pair.progress}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${
-                            item.status === "completed"
-                              ? "bg-green-500"
-                              : item.status === "error"
-                              ? "bg-red-500"
-                              : "bg-blue-500"
-                          }`}
-                          style={{
-                            width: `${
-                              item.status === "completed" ? 100 : item.progress
-                            }%`,
-                          }}
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${pair.progress}%` }}
                         />
                       </div>
-                      {item.error && (
-                        <div className="text-sm text-red-600 mt-1">
-                          {item.error}
-                        </div>
-                      )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeUploadItem(item.id)}
-                      className="ml-2"
-                    >
-                      제거
-                    </Button>
-                  </div>
-                ))}
+                  )}
+
+                  {/* 완료 상태 */}
+                  {pair.completed && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-md">
+                      <div className="flex items-center text-green-700">
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        업로드 완료
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 에러 상태 */}
+                  {pair.error && (
+                    <div className="mt-4 p-3 bg-red-50 rounded-md">
+                      <div className="flex items-center text-red-700">
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        {pair.error}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 개별 업로드 버튼 */}
+                  {pair.imageFile && pair.xmlFile && !pair.completed && (
+                    <div className="mt-4">
+                      <Button
+                        onClick={() => uploadPair(pair)}
+                        disabled={pair.uploading || pair.nameMatchError}
+                        className="w-full"
+                      >
+                        {pair.uploading
+                          ? "업로드 중..."
+                          : pair.nameMatchError
+                          ? "파일명 불일치"
+                          : "이 쌍 업로드"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* 컨트롤 버튼들 */}
+              <div className="flex justify-between items-center pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={addNewPair}
+                  disabled={!authToken}
+                >
+                  + 파일 쌍 추가
+                </Button>
+
+                <Button
+                  onClick={uploadAll}
+                  disabled={
+                    !authToken ||
+                    uploadPairs.some((p) => p.uploading) ||
+                    !uploadPairs.some(
+                      (p) =>
+                        p.imageFile &&
+                        p.xmlFile &&
+                        !p.completed &&
+                        !p.nameMatchError
+                    )
+                  }
+                  className="px-6"
+                >
+                  전체 업로드
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* 가이드 목록 */}
         <Card>
@@ -568,22 +852,11 @@ export default function AdminPage() {
                         <div className="mb-3">
                           <div className="w-full h-32 bg-gray-100 border rounded flex items-center justify-center">
                             <div className="text-center">
-                              <svg
-                                className="mx-auto h-10 w-10 text-gray-400 mb-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                              </svg>
-                              <span className="text-gray-500 text-xs">
-                                XML 가이드
-                              </span>
+                              {/* <Image
+                                src={`https://cdn.chalpu.com/${guide.s3Key}`}
+                                alt={guide.fileName}
+                                className="max-h-full max-w-full"
+                              /> */}
                             </div>
                           </div>
                         </div>
@@ -621,19 +894,11 @@ export default function AdminPage() {
                       >
                         <div className="flex items-center space-x-3">
                           <div className="flex-shrink-0">
-                            <svg
-                              className="h-8 w-8 text-gray-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
+                            {/* <Image
+                              src={`https://cdn.chalpu.com/${guide.s3Key}`}
+                              alt={guide.fileName}
+                              className="max-h-8 max-w-8"
+                            /> */}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-gray-900 truncate text-sm">
