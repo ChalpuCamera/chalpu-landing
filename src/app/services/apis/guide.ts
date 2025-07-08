@@ -99,7 +99,10 @@ export const uploadGuideToS3 = async (
   });
 
   try {
-    const isImageFile = file.type.startsWith("image/");
+    const isImageFile =
+      file.type.startsWith("image/") && !file.type.includes("svg");
+    const isSvgFile =
+      file.type === "image/svg+xml" || file.name.endsWith(".svg");
     const isXmlFile =
       file.type === "application/xml" || file.name.endsWith(".xml");
 
@@ -113,6 +116,15 @@ export const uploadGuideToS3 = async (
       contentType = "application/xml";
       console.log(
         "📝 XML 내용 미리보기:",
+        uploadData.substring(0, 200) + "..."
+      );
+    } else if (isSvgFile) {
+      // SVG 파일의 경우 텍스트로 읽어서 업로드
+      console.log("🎨 SVG 파일 원본 데이터 읽는 중...");
+      uploadData = await file.text();
+      contentType = "image/svg+xml";
+      console.log(
+        "🎨 SVG 내용 미리보기:",
         uploadData.substring(0, 200) + "..."
       );
     } else if (isImageFile) {
@@ -161,6 +173,7 @@ export const uploadGuideToS3 = async (
  */
 export const registerGuide = async (
   guideS3Key: string,
+  svgS3Key: string,
   fileName: string,
   imageS3Key: string,
   subCategoryId: number,
@@ -169,6 +182,7 @@ export const registerGuide = async (
 ): Promise<GuideRegisterResponse> => {
   const request: GuideRegisterRequest = {
     guideS3Key,
+    svgS3Key,
     fileName,
     imageS3Key,
     subCategoryId,
@@ -203,6 +217,7 @@ export const deleteGuides = async (guideIds: number[]): Promise<void> => {
 export const uploadGuidePair = async (
   imageFile: File,
   xmlFile: File,
+  svgFile: File,
   fileName: string,
   subCategoryId: number,
   content?: string,
@@ -211,8 +226,14 @@ export const uploadGuidePair = async (
 ): Promise<Guide> => {
   try {
     // 1. Presigned URL 생성
-    const { guideUploadUrl, guideS3Key, imageUploadUrl, imageS3Key } =
-      await getGuidePresignedUrl(fileName);
+    const {
+      guideUploadUrl,
+      guideS3Key,
+      imageUploadUrl,
+      imageS3Key,
+      svgUploadUrl,
+      svgS3Key,
+    } = await getGuidePresignedUrl(fileName);
 
     // 2. 이미지 파일 S3에 업로드
     await uploadGuideToS3(imageUploadUrl, imageFile, (progress) => {
@@ -228,13 +249,21 @@ export const uploadGuidePair = async (
       }
     });
 
-    // 4. 서버에 메타데이터 등록
+    // 4. SVG 파일 S3에 업로드
+    await uploadGuideToS3(svgUploadUrl, svgFile, (progress) => {
+      if (onProgress) {
+        onProgress(80 + progress.percentage * 0.2); // 80%~100%
+      }
+    });
+
+    // 5. 서버에 메타데이터 등록
     if (onProgress) {
       onProgress(80); // 80%
     }
 
     const guide = await registerGuide(
       guideS3Key,
+      svgS3Key,
       fileName,
       imageS3Key,
       subCategoryId,

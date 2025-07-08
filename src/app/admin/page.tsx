@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 import {
   getGuides,
   deleteGuides,
@@ -34,6 +35,78 @@ import {
 } from "@/components/landing/ui/dialog";
 import Image from "next/image";
 
+// SVG-이미지 나란히 보기 컴포넌트
+const   SvgImagePreview = ({
+  guide,
+  className,
+}: {
+  guide: Guide;
+  className?: string;
+}) => {
+  const [svgError, setSvgError] = useState(false);
+  const [svgLoading, setSvgLoading] = useState(true);
+
+  const handleSvgLoad = () => {
+    console.log("SVG object 로드 성공");
+    setSvgLoading(false);
+  };
+
+  const handleSvgError = () => {
+    console.log("SVG object 로드 실패");
+    setSvgError(true);
+    setSvgLoading(false);
+  };
+
+  return (
+    <div className="w-full h-full flex space-x-2">
+      {/* SVG 미리보기 */}
+      <div className="flex-1 relative overflow-hidden border rounded bg-gray-200">
+        <div className="absolute top-1 left-1 z-10 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
+          SVG
+        </div>
+        {!svgError ? (
+          <>
+            <object
+              data={`https://cdn.chalpu.com/${guide.svgS3Key}`}
+              type="image/svg+xml"
+              onLoad={handleSvgLoad}
+              onError={handleSvgError}
+              className={`w-full h-full transition-opacity duration-300 ${
+                svgLoading ? "opacity-0" : "opacity-100"
+              }`}
+              style={{
+                objectFit: "contain",
+              }}
+            />
+            {svgLoading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-xs text-gray-500">SVG 로딩 중...</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-xs text-red-500">SVG 로드 실패</div>
+          </div>
+        )}
+      </div>
+
+      {/* 이미지 미리보기 */}
+      <div className="flex-1 relative overflow-hidden border rounded bg-gray-50">
+        <div className="absolute top-1 left-1 z-10 text-xs bg-black bg-opacity-50 text-white px-1 rounded">
+          IMG
+        </div>
+        <Image
+          src={`https://cdn.chalpu.com/${guide.imageS3Key}`}
+          alt={guide.fileName}
+          fill
+          className={`${className} object-contain`}
+        />
+      </div>
+    </div>
+  );
+};
+
 export default function AdminPage() {
   const [mounted, setMounted] = useState(false);
   const [guides, setGuides] = useState<Guide[]>([]);
@@ -60,38 +133,36 @@ export default function AdminPage() {
   const [sortBy, setSortBy] = useState<"id" | "name" | "category">("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // 파일 쌍 업로드 관련 상태
-  interface FileUploadPair {
+  // 파일 트리플 업로드 관련 상태 (SVG, XML, 이미지)
+  interface FileUploadTriple {
     id: string;
-    imageFile: File | null;
-    xmlFile: File | null;
+    svgFile: File | null; // SVG 파일 (UI 미리보기용)
+    xmlFile: File | null; // XML 파일 (안드로이드용, SVG에서 자동 변환)
+    imageFile: File | null; // 이미지 파일
     fileName: string;
     uploading: boolean;
     progress: number;
     error: string | null;
     completed: boolean;
     nameMatchError: boolean;
-    originalXmlFileName?: string; // SVG에서 변환된 경우 원본 파일명 저장
-    isConvertedFromSvg?: boolean; // SVG에서 변환되었는지 여부
     category: FoodCategory; // 선택된 카테고리
     content?: string; // 가이드 설명
     tags: string[]; // 태그 목록
     tagInput: string; // 태그 입력 필드
   }
 
-  const [uploadPairs, setUploadPairs] = useState<FileUploadPair[]>([
+  const [uploadTriples, setUploadTriples] = useState<FileUploadTriple[]>([
     {
-      id: "pair-1",
-      imageFile: null,
+      id: "triple-1",
+      svgFile: null,
       xmlFile: null,
+      imageFile: null,
       fileName: "",
       uploading: false,
       progress: 0,
       error: null,
       completed: false,
       nameMatchError: false,
-      originalXmlFileName: undefined,
-      isConvertedFromSvg: false,
       category: FoodCategory.COFFEE,
       content: "",
       tags: [],
@@ -191,57 +262,118 @@ export default function AdminPage() {
     }
   }, [mounted, authToken, loadGuides]);
 
-  // 새 파일 쌍 추가
-  const addNewPair = () => {
-    const newPair: FileUploadPair = {
-      id: `pair-${Date.now()}`,
-      imageFile: null,
+  // 새 파일 트리플 추가
+  const addNewTriple = () => {
+    const newTriple: FileUploadTriple = {
+      id: `triple-${Date.now()}`,
+      svgFile: null,
       xmlFile: null,
+      imageFile: null,
       fileName: "",
       uploading: false,
       progress: 0,
       error: null,
       completed: false,
       nameMatchError: false,
-      originalXmlFileName: undefined,
-      isConvertedFromSvg: false,
       category: FoodCategory.COFFEE,
       content: "",
       tags: [],
       tagInput: "",
     };
-    setUploadPairs((prev) => [...prev, newPair]);
+    setUploadTriples((prev) => [...prev, newTriple]);
   };
 
-  // 파일 쌍 제거
-  const removePair = (id: string) => {
-    setUploadPairs((prev) => prev.filter((pair) => pair.id !== id));
+  // 파일 트리플 제거
+  const removeTriple = (id: string) => {
+    setUploadTriples((prev) => prev.filter((triple) => triple.id !== id));
   };
 
-  // SVG를 XML로 변환하는 함수
-  const convertSvgToXml = async (svgFile: File): Promise<File> => {
+  // SVG를 안드로이드 Vector Drawable XML로 변환하는 함수
+  const convertSvgToAndroidXml = async (svgFile: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          let svgContent = e.target?.result as string;
+          const svgContent = e.target?.result as string;
 
-          // SVG 내용을 정리하고 XML 형식으로 변환
-          // SVG 자체가 XML이므로 기본적으로는 그대로 사용하지만,
-          // 필요시 추가적인 정리 작업을 수행할 수 있습니다.
+          // DOM parser로 SVG 파싱
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
+          const svgElement = svgDoc.querySelector("svg");
 
-          // XML 선언이 없다면 추가
-          if (!svgContent.startsWith("<?xml")) {
-            svgContent =
-              '<?xml version="1.0" encoding="UTF-8"?>\n' + svgContent;
+          if (!svgElement) {
+            throw new Error("유효한 SVG 파일이 아닙니다.");
           }
 
-          // 새로운 XML 파일명 생성 (확장자를 .xml로 변경)
+          // SVG 속성 추출
+          const width = svgElement.getAttribute("width") || "24";
+          const height = svgElement.getAttribute("height") || "24";
+          const viewBox =
+            svgElement.getAttribute("viewBox") || `0 0 ${width} ${height}`;
+          const viewBoxValues = viewBox.split(" ");
+          const viewportWidth = viewBoxValues[2] || width;
+          const viewportHeight = viewBoxValues[3] || height;
+
+          // 안드로이드 Vector Drawable XML 생성
+          let vectorXml = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="${parseInt(width.replace(/[^0-9]/g, "")) || 24}dp"
+    android:height="${parseInt(height.replace(/[^0-9]/g, "")) || 24}dp"
+    android:viewportWidth="${viewportWidth}"
+    android:viewportHeight="${viewportHeight}">
+`;
+
+          // path 요소들 변환
+          const paths = svgElement.querySelectorAll("path");
+          paths.forEach((path) => {
+            const pathData = path.getAttribute("d") || "";
+            const fill = path.getAttribute("fill") || "#000000";
+            const stroke = path.getAttribute("stroke");
+            const strokeWidth = path.getAttribute("stroke-width");
+
+            vectorXml += `    <path android:pathData="${pathData}"`;
+
+            if (fill && fill !== "none") {
+              vectorXml += `\n        android:fillColor="${fill}"`;
+            }
+
+            if (stroke && stroke !== "none") {
+              vectorXml += `\n        android:strokeColor="${stroke}"`;
+            }
+
+            if (strokeWidth) {
+              vectorXml += `\n        android:strokeWidth="${strokeWidth}"`;
+            }
+
+            vectorXml += " />\n";
+          });
+
+          // group 요소들도 처리 (기본적인 변환)
+          const groups = svgElement.querySelectorAll("g");
+          groups.forEach((group) => {
+            const groupPaths = group.querySelectorAll("path");
+            if (groupPaths.length > 0) {
+              vectorXml += `    <group>\n`;
+              groupPaths.forEach((path) => {
+                const pathData = path.getAttribute("d") || "";
+                const fill =
+                  path.getAttribute("fill") ||
+                  group.getAttribute("fill") ||
+                  "#000000";
+                vectorXml += `        <path android:pathData="${pathData}"\n            android:fillColor="${fill}" />\n`;
+              });
+              vectorXml += `    </group>\n`;
+            }
+          });
+
+          vectorXml += `</vector>`;
+
+          // 새로운 XML 파일명 생성
           const originalName = svgFile.name.replace(/\.svg$/i, "");
           const xmlFileName = `${originalName}.xml`;
 
           // Blob을 File로 변환
-          const blob = new Blob([svgContent], { type: "application/xml" });
+          const blob = new Blob([vectorXml], { type: "application/xml" });
           const xmlFile = new File([blob], xmlFileName, {
             type: "application/xml",
             lastModified: Date.now(),
@@ -249,7 +381,12 @@ export default function AdminPage() {
 
           resolve(xmlFile);
         } catch (error) {
-          reject(new Error("SVG to XML 변환 중 오류가 발생했습니다."));
+          console.error("SVG 파싱 오류:", error);
+          reject(
+            new Error(
+              "SVG를 안드로이드 Vector Drawable로 변환 중 오류가 발생했습니다."
+            )
+          );
         }
       };
 
@@ -261,219 +398,213 @@ export default function AdminPage() {
     });
   };
 
-  // 파일명 매칭 검증 함수
-  const validateFileNameMatch = (
-    imageFile: File | null,
-    xmlFile: File | null
+  // 파일명 매칭 검증 함수 (3개 파일)
+  const validateTripleFileNameMatch = (
+    svgFile: File | null,
+    imageFile: File | null
   ) => {
-    if (!imageFile || !xmlFile) return { isValid: true, fileName: "" };
+    if (!svgFile || !imageFile) return { isValid: true, fileName: "" };
 
+    const svgName = svgFile.name.replace(/\.svg$/i, "");
     const imageName = imageFile.name.replace(/\.(png|jpg|jpeg)$/i, "");
-    const xmlName = xmlFile.name.replace(/\.(xml|svg)$/i, "");
 
     return {
-      isValid: imageName === xmlName,
-      fileName: imageName === xmlName ? imageName : "",
+      isValid: svgName === imageName,
+      fileName: svgName === imageName ? svgName : "",
     };
   };
 
+  // SVG 파일 선택 (XML은 자동 생성)
+  const handleSvgSelect = async (tripleId: string, file: File) => {
+    try {
+      // SVG에서 XML 자동 생성
+      const xmlFile = await convertSvgToAndroidXml(file);
+
+      setUploadTriples((prev) =>
+        prev.map((triple) => {
+          if (triple.id === tripleId) {
+            const validation = validateTripleFileNameMatch(
+              file,
+              triple.imageFile
+            );
+            return {
+              ...triple,
+              svgFile: file,
+              xmlFile: xmlFile,
+              fileName: validation.fileName,
+              nameMatchError: !validation.isValid,
+            };
+          }
+          return triple;
+        })
+      );
+
+      toast.success(`${file.name}을 선택하고 XML을 자동 생성했습니다.`);
+    } catch (error) {
+      console.error("SVG 처리 중 오류:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "SVG 처리 중 오류가 발생했습니다."
+      );
+    }
+  };
+
   // 이미지 파일 선택
-  const handleImageSelect = (pairId: string, file: File) => {
-    setUploadPairs((prev) =>
-      prev.map((pair) => {
-        if (pair.id === pairId) {
-          const validation = validateFileNameMatch(file, pair.xmlFile);
+  const handleImageSelect = (tripleId: string, file: File) => {
+    setUploadTriples((prev) =>
+      prev.map((triple) => {
+        if (triple.id === tripleId) {
+          const validation = validateTripleFileNameMatch(triple.svgFile, file);
           return {
-            ...pair,
+            ...triple,
             imageFile: file,
             fileName: validation.fileName,
             nameMatchError: !validation.isValid,
           };
         }
-        return pair;
+        return triple;
       })
     );
   };
 
-  // XML/SVG 파일 선택
-  const handleXmlSelect = async (pairId: string, file: File) => {
-    try {
-      let processedFile = file;
-
-      // SVG 파일인지 확인
-      const isSvgFile =
-        file.type === "image/svg+xml" ||
-        file.name.toLowerCase().endsWith(".svg");
-
-      // SVG 파일이면 XML로 변환
-      if (isSvgFile) {
-        toast.info(`${file.name}을 XML로 변환 중...`);
-        processedFile = await convertSvgToXml(file);
-        toast.success(`${file.name}을 XML로 변환했습니다.`);
-      }
-
-      setUploadPairs((prev) =>
-        prev.map((pair) => {
-          if (pair.id === pairId) {
-            const validation = validateFileNameMatch(
-              pair.imageFile,
-              processedFile
-            );
-            return {
-              ...pair,
-              xmlFile: processedFile,
-              fileName: validation.fileName,
-              nameMatchError: !validation.isValid,
-              originalXmlFileName: isSvgFile ? file.name : undefined,
-              isConvertedFromSvg: isSvgFile,
-            };
-          }
-          return pair;
-        })
-      );
-    } catch (error) {
-      console.error("파일 처리 중 오류:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "파일 처리 중 오류가 발생했습니다."
-      );
-    }
-  };
-
-  // 이미지 파일 제거
-  const removeImageFile = (pairId: string) => {
-    setUploadPairs((prev) =>
-      prev.map((pair) => {
-        if (pair.id === pairId) {
-          // XML 파일이 있으면 XML 파일명으로, 없으면 빈 문자열
-          const fileName = pair.xmlFile
-            ? pair.xmlFile.name.replace(/\.xml$/i, "")
+  // SVG 파일 제거 (XML도 함께 제거)
+  const removeSvgFile = (tripleId: string) => {
+    setUploadTriples((prev) =>
+      prev.map((triple) => {
+        if (triple.id === tripleId) {
+          // 이미지 파일이 있으면 이미지 파일명으로, 없으면 빈 문자열
+          const fileName = triple.imageFile
+            ? triple.imageFile.name.replace(/\.(png|jpg|jpeg)$/i, "")
             : "";
           return {
-            ...pair,
-            imageFile: null,
+            ...triple,
+            svgFile: null,
+            xmlFile: null, // SVG가 제거되면 XML도 함께 제거
             fileName,
-            nameMatchError: false, // 파일이 하나만 있을 때는 에러 없음
+            nameMatchError: false,
           };
         }
-        return pair;
+        return triple;
       })
     );
     // 파일 input 초기화
     const input = document.getElementById(
-      `image-${pairId}`
+      `svg-${tripleId}`
     ) as HTMLInputElement;
     if (input) input.value = "";
   };
 
-  // XML/SVG 파일 제거
-  const removeXmlFile = (pairId: string) => {
-    setUploadPairs((prev) =>
-      prev.map((pair) => {
-        if (pair.id === pairId) {
-          // 이미지 파일이 있으면 이미지 파일명으로, 없으면 빈 문자열
-          const fileName = pair.imageFile
-            ? pair.imageFile.name.replace(/\.(png|jpg|jpeg)$/i, "")
+  // 이미지 파일 제거
+  const removeImageFile = (tripleId: string) => {
+    setUploadTriples((prev) =>
+      prev.map((triple) => {
+        if (triple.id === tripleId) {
+          // SVG 파일이 있으면 SVG 파일명으로, 없으면 빈 문자열
+          const fileName = triple.svgFile
+            ? triple.svgFile.name.replace(/\.svg$/i, "")
             : "";
           return {
-            ...pair,
-            xmlFile: null,
+            ...triple,
+            imageFile: null,
             fileName,
-            nameMatchError: false, // 파일이 하나만 있을 때는 에러 없음
-            originalXmlFileName: undefined,
-            isConvertedFromSvg: false,
+            nameMatchError: false,
           };
         }
-        return pair;
+        return triple;
       })
     );
     // 파일 input 초기화
-    const input = document.getElementById(`xml-${pairId}`) as HTMLInputElement;
+    const input = document.getElementById(
+      `image-${tripleId}`
+    ) as HTMLInputElement;
     if (input) input.value = "";
   };
 
-  // 개별 파일 쌍 업로드
-  const uploadPair = async (pair: FileUploadPair) => {
-    if (!pair.imageFile || !pair.xmlFile || !authToken) return;
+  // 개별 파일 트리플 업로드
+  const uploadTriple = async (triple: FileUploadTriple) => {
+    if (!triple.imageFile || !triple.xmlFile || !triple.svgFile || !authToken)
+      return;
 
-    setUploadPairs((prev) =>
-      prev.map((p) =>
-        p.id === pair.id
-          ? { ...p, uploading: true, progress: 0, error: null }
-          : p
+    setUploadTriples((prev) =>
+      prev.map((t) =>
+        t.id === triple.id
+          ? { ...t, uploading: true, progress: 0, error: null }
+          : t
       )
     );
 
     try {
       const guide = await uploadGuidePair(
-        pair.imageFile,
-        pair.xmlFile,
-        pair.fileName,
-        pair.category,
-        pair.content,
-        pair.tags,
+        triple.imageFile,
+        triple.xmlFile!,
+        triple.svgFile!,
+        triple.fileName,
+        triple.category,
+        triple.content,
+        triple.tags,
         (progress) => {
-          setUploadPairs((prev) =>
-            prev.map((p) => (p.id === pair.id ? { ...p, progress } : p))
+          setUploadTriples((prev) =>
+            prev.map((t) => (t.id === triple.id ? { ...t, progress } : t))
           );
         }
       );
 
-      setUploadPairs((prev) =>
-        prev.map((p) =>
-          p.id === pair.id
-            ? { ...p, progress: 100, completed: true, uploading: false }
-            : p
+      setUploadTriples((prev) =>
+        prev.map((t) =>
+          t.id === triple.id
+            ? { ...t, progress: 100, completed: true, uploading: false }
+            : t
         )
       );
 
       // 개별 업로드 완료 후 가이드 목록 새로고침
-      toast.success(`${pair.fileName} 업로드 완료`);
+      toast.success(`${triple.fileName} 업로드 완료`);
+      loadGuides();
     } catch (error) {
       console.error("업로드 실패:", error);
-      setUploadPairs((prev) =>
-        prev.map((p) =>
-          p.id === pair.id
+      setUploadTriples((prev) =>
+        prev.map((t) =>
+          t.id === triple.id
             ? {
-                ...p,
+                ...t,
                 uploading: false,
                 error: error instanceof Error ? error.message : "업로드 실패",
               }
-            : p
+            : t
         )
       );
-      toast.error(`${pair.fileName} 업로드 실패`);
+      toast.error(`${triple.fileName} 업로드 실패`);
     }
-    window.location.reload();
   };
 
   // 전체 업로드
   const uploadAll = async () => {
-    const validPairs = uploadPairs.filter(
-      (pair) =>
-        pair.imageFile &&
-        pair.xmlFile &&
-        !pair.completed &&
-        !pair.nameMatchError
+    const validTriples = uploadTriples.filter(
+      (triple) =>
+        triple.imageFile &&
+        triple.xmlFile &&
+        triple.svgFile &&
+        !triple.completed &&
+        !triple.nameMatchError
     );
 
     let successCount = 0;
-    for (const pair of validPairs) {
+    for (const triple of validTriples) {
       try {
-        await uploadPair(pair);
+        await uploadTriple(triple);
         successCount++;
       } catch (error) {
-        console.error(`Failed to upload pair ${pair.fileName}:`, error);
+        console.error(`Failed to upload triple ${triple.fileName}:`, error);
       }
     }
 
     // 업로드 완료 후 가이드 목록 새로고침 (성공한 업로드가 있을 때만)
     if (successCount > 0) {
       toast.success(
-        `${successCount}개의 파일 쌍이 성공적으로 업로드되었습니다.`
+        `${successCount}개의 파일 트리플이 성공적으로 업로드되었습니다.`
       );
-      window.location.reload();
+      loadGuides();
     }
   };
 
@@ -871,22 +1002,25 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {uploadPairs.map((pair, index) => (
-                <div key={pair.id} className="border rounded-lg p-4 bg-gray-50">
+              {uploadTriples.map((triple, index) => (
+                <div
+                  key={triple.id}
+                  className="border rounded-lg p-4 bg-gray-50"
+                >
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium text-gray-900">
-                      파일 쌍 {index + 1}
-                      {pair.fileName && (
+                      파일 트리플 {index + 1}
+                      {triple.fileName && (
                         <span className="ml-2 text-sm text-gray-600">
-                          ({pair.fileName})
+                          ({triple.fileName})
                         </span>
                       )}
                     </h3>
-                    {uploadPairs.length > 1 && (
+                    {uploadTriples.length > 1 && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => removePair(pair.id)}
+                        onClick={() => removeTriple(triple.id)}
                         className="text-red-600 hover:text-red-700"
                       >
                         제거
@@ -894,35 +1028,35 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* 이미지 파일 선택 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* SVG 파일 선택 */}
                     <div className="space-y-2">
                       <Label
-                        htmlFor={`image-${pair.id}`}
+                        htmlFor={`svg-${triple.id}`}
                         className="text-sm font-medium"
                       >
-                        이미지 파일 (PNG/JPG)
+                        SVG 파일 (UI용)
                       </Label>
                       <div className="relative">
                         <input
-                          id={`image-${pair.id}`}
+                          id={`svg-${triple.id}`}
                           type="file"
-                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                          accept=".svg,image/svg+xml"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handleImageSelect(pair.id, file);
+                            if (file) handleSvgSelect(triple.id, file);
                           }}
                           className="w-full p-2 border rounded-md text-sm"
-                          disabled={pair.uploading || pair.completed}
+                          disabled={triple.uploading || triple.completed}
                         />
-                        {pair.imageFile && (
-                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm flex items-center justify-between">
-                            <span className="text-blue-700">
-                              ✓ {pair.imageFile.name}
+                        {triple.svgFile && (
+                          <div className="mt-2 p-2 bg-purple-50 rounded text-sm flex items-center justify-between">
+                            <span className="text-purple-700">
+                              ✓ {triple.svgFile.name}
                             </span>
                             <button
-                              onClick={() => removeImageFile(pair.id)}
-                              disabled={pair.uploading || pair.completed}
+                              onClick={() => removeSvgFile(triple.id)}
+                              disabled={triple.uploading || triple.completed}
                               className="text-red-500 hover:text-red-700 ml-2 disabled:opacity-50"
                             >
                               <svg
@@ -942,61 +1076,72 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* XML/SVG 파일 선택 */}
+                    {/* XML 파일 상태 (자동 생성) */}
                     <div className="space-y-2">
-                      <Label
-                        htmlFor={`xml-${pair.id}`}
-                        className="text-sm font-medium"
-                      >
-                        XML/SVG 파일
+                      <Label className="text-sm font-medium">
+                        XML 파일 (자동 변환)
                       </Label>
                       <div className="relative">
-                        <input
-                          id={`xml-${pair.id}`}
-                          type="file"
-                          accept=".xml,.svg,application/xml,text/xml,image/svg+xml"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleXmlSelect(pair.id, file);
-                          }}
-                          className="w-full p-2 border rounded-md text-sm"
-                          disabled={pair.uploading || pair.completed}
-                        />
-                        {pair.xmlFile && (
+                        <div className="w-full p-2 border border-dashed rounded-md text-sm bg-gray-100 text-gray-500">
+                          SVG에서 자동 생성됨
+                        </div>
+                        {triple.xmlFile && (
                           <div className="mt-2 p-2 bg-green-50 rounded text-sm">
                             <div className="flex items-center justify-between">
                               <span className="text-green-700">
-                                ✓ {pair.xmlFile.name}
-                                {pair.isConvertedFromSvg && (
-                                  <span className="ml-2 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                                    SVG→XML 변환됨
-                                  </span>
-                                )}
+                                ✓ {triple.xmlFile.name}
+                                <span className="ml-2 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                                  자동 생성됨
+                                </span>
                               </span>
-                              <button
-                                onClick={() => removeXmlFile(pair.id)}
-                                disabled={pair.uploading || pair.completed}
-                                className="text-red-500 hover:text-red-700 ml-2 disabled:opacity-50"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                              </button>
                             </div>
-                            {pair.isConvertedFromSvg &&
-                              pair.originalXmlFileName && (
-                                <div className="mt-1 text-xs text-gray-600">
-                                  원본: {pair.originalXmlFileName}
-                                </div>
-                              )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 이미지 파일 선택 */}
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`image-${triple.id}`}
+                        className="text-sm font-medium"
+                      >
+                        이미지 파일 (PNG/JPG)
+                      </Label>
+                      <div className="relative">
+                        <input
+                          id={`image-${triple.id}`}
+                          type="file"
+                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageSelect(triple.id, file);
+                          }}
+                          className="w-full p-2 border rounded-md text-sm"
+                          disabled={triple.uploading || triple.completed}
+                        />
+                        {triple.imageFile && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm flex items-center justify-between">
+                            <span className="text-blue-700">
+                              ✓ {triple.imageFile.name}
+                            </span>
+                            <button
+                              onClick={() => removeImageFile(triple.id)}
+                              disabled={triple.uploading || triple.completed}
+                              className="text-red-500 hover:text-red-700 ml-2 disabled:opacity-50"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1008,27 +1153,27 @@ export default function AdminPage() {
                     {/* 카테고리 선택 */}
                     <div className="space-y-2">
                       <Label
-                        htmlFor={`category-${pair.id}`}
+                        htmlFor={`category-${triple.id}`}
                         className="text-sm font-medium"
                       >
                         카테고리 *
                       </Label>
                       <select
-                        id={`category-${pair.id}`}
-                        value={pair.category}
+                        id={`category-${triple.id}`}
+                        value={triple.category}
                         onChange={(e) => {
                           const selectedCategory = Number(
                             e.target.value
                           ) as FoodCategory;
-                          setUploadPairs((prev) =>
-                            prev.map((p) =>
-                              p.id === pair.id
-                                ? { ...p, category: selectedCategory }
-                                : p
+                          setUploadTriples((prev) =>
+                            prev.map((t) =>
+                              t.id === triple.id
+                                ? { ...t, category: selectedCategory }
+                                : t
                             )
                           );
                         }}
-                        disabled={pair.uploading || pair.completed}
+                        disabled={triple.uploading || triple.completed}
                         className="w-full p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         {FOOD_CATEGORY_OPTIONS.map((option) => (
@@ -1042,26 +1187,26 @@ export default function AdminPage() {
                     {/* 설명 입력 */}
                     <div className="space-y-2">
                       <Label
-                        htmlFor={`content-${pair.id}`}
+                        htmlFor={`content-${triple.id}`}
                         className="text-sm font-medium"
                       >
                         설명 (선택사항)
                       </Label>
                       <Input
-                        id={`content-${pair.id}`}
+                        id={`content-${triple.id}`}
                         type="text"
                         placeholder="가이드에 대한 설명을 입력하세요..."
-                        value={pair.content || ""}
+                        value={triple.content || ""}
                         onChange={(e) => {
-                          setUploadPairs((prev) =>
-                            prev.map((p) =>
-                              p.id === pair.id
-                                ? { ...p, content: e.target.value }
-                                : p
+                          setUploadTriples((prev) =>
+                            prev.map((t) =>
+                              t.id === triple.id
+                                ? { ...t, content: e.target.value }
+                                : t
                             )
                           );
                         }}
-                        disabled={pair.uploading || pair.completed}
+                        disabled={triple.uploading || triple.completed}
                         className="text-sm"
                       />
                     </div>
@@ -1070,92 +1215,92 @@ export default function AdminPage() {
                   {/* 태그 입력 */}
                   <div className="mt-4 space-y-2">
                     <Label
-                      htmlFor={`tags-${pair.id}`}
+                      htmlFor={`tags-${triple.id}`}
                       className="text-sm font-medium"
                     >
                       태그 (선택사항)
                     </Label>
                     <Input
-                      id={`tags-${pair.id}`}
+                      id={`tags-${triple.id}`}
                       type="text"
                       placeholder="태그를 입력하고 Enter나 쉼표를 누르세요 (예: 맛있는)"
-                      value={pair.tagInput}
+                      value={triple.tagInput}
                       onChange={(e) => {
-                        setUploadPairs((prev) =>
-                          prev.map((p) =>
-                            p.id === pair.id
-                              ? { ...p, tagInput: e.target.value }
-                              : p
+                        setUploadTriples((prev) =>
+                          prev.map((t) =>
+                            t.id === triple.id
+                              ? { ...t, tagInput: e.target.value }
+                              : t
                           )
                         );
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === ",") {
                           e.preventDefault();
-                          const newTag = pair.tagInput.trim();
-                          if (newTag && !pair.tags.includes(newTag)) {
-                            setUploadPairs((prev) =>
-                              prev.map((p) =>
-                                p.id === pair.id
+                          const newTag = triple.tagInput.trim();
+                          if (newTag && !triple.tags.includes(newTag)) {
+                            setUploadTriples((prev) =>
+                              prev.map((t) =>
+                                t.id === triple.id
                                   ? {
-                                      ...p,
-                                      tags: [...p.tags, newTag],
+                                      ...t,
+                                      tags: [...t.tags, newTag],
                                       tagInput: "",
                                     }
-                                  : p
+                                  : t
                               )
                             );
                           } else if (newTag) {
                             // 이미 존재하는 태그인 경우 입력 필드만 초기화
-                            setUploadPairs((prev) =>
-                              prev.map((p) =>
-                                p.id === pair.id ? { ...p, tagInput: "" } : p
+                            setUploadTriples((prev) =>
+                              prev.map((t) =>
+                                t.id === triple.id ? { ...t, tagInput: "" } : t
                               )
                             );
                           }
                         } else if (
                           e.key === "Backspace" &&
-                          pair.tagInput === "" &&
-                          pair.tags.length > 0
+                          triple.tagInput === "" &&
+                          triple.tags.length > 0
                         ) {
                           // 입력 필드가 비어있고 백스페이스를 누르면 마지막 태그 삭제
-                          setUploadPairs((prev) =>
-                            prev.map((p) =>
-                              p.id === pair.id
+                          setUploadTriples((prev) =>
+                            prev.map((t) =>
+                              t.id === triple.id
                                 ? {
-                                    ...p,
-                                    tags: p.tags.slice(0, -1),
+                                    ...t,
+                                    tags: t.tags.slice(0, -1),
                                   }
-                                : p
+                                : t
                             )
                           );
                         }
                       }}
                       onBlur={() => {
                         // 포커스를 잃을 때도 태그 추가
-                        const newTag = pair.tagInput.trim();
-                        if (newTag && !pair.tags.includes(newTag)) {
-                          setUploadPairs((prev) =>
-                            prev.map((p) =>
-                              p.id === pair.id
+                        const newTag = triple.tagInput.trim();
+                        if (newTag && !triple.tags.includes(newTag)) {
+                          setUploadTriples((prev) =>
+                            prev.map((t) =>
+                              t.id === triple.id
                                 ? {
-                                    ...p,
-                                    tags: [...p.tags, newTag],
+                                    ...t,
+                                    tags: [...t.tags, newTag],
                                     tagInput: "",
                                   }
-                                : p
+                                : t
                             )
                           );
                         }
                       }}
-                      disabled={pair.uploading || pair.completed}
+                      disabled={triple.uploading || triple.completed}
                       className="text-sm"
                     />
 
                     {/* 태그 표시 */}
-                    {pair.tags.length > 0 && (
+                    {triple.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {pair.tags.map((tag, tagIndex) => (
+                        {triple.tags.map((tag, tagIndex) => (
                           <span
                             key={tagIndex}
                             className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
@@ -1163,20 +1308,20 @@ export default function AdminPage() {
                             {tag}
                             <button
                               onClick={() => {
-                                setUploadPairs((prev) =>
-                                  prev.map((p) =>
-                                    p.id === pair.id
+                                setUploadTriples((prev) =>
+                                  prev.map((t) =>
+                                    t.id === triple.id
                                       ? {
-                                          ...p,
-                                          tags: p.tags.filter(
+                                          ...t,
+                                          tags: t.tags.filter(
                                             (_, i) => i !== tagIndex
                                           ),
                                         }
-                                      : p
+                                      : t
                                   )
                                 );
                               }}
-                              disabled={pair.uploading || pair.completed}
+                              disabled={triple.uploading || triple.completed}
                               className="ml-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
                             >
                               ×
@@ -1194,7 +1339,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* 파일명 불일치 에러 메시지 */}
-                  {pair.nameMatchError && (
+                  {triple.nameMatchError && (
                     <div className="mt-4 p-3 bg-orange-50 rounded-md">
                       <div className="flex items-center text-orange-700">
                         <svg
@@ -1208,34 +1353,34 @@ export default function AdminPage() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        파일명이 일치하지 않습니다. 이미지와 XML/SVG 파일의
+                        파일명이 일치하지 않습니다. SVG와 이미지 파일의
                         이름(확장자 제외)이 동일해야 합니다.
                       </div>
                     </div>
                   )}
 
                   {/* 업로드 상태 */}
-                  {pair.uploading && (
+                  {triple.uploading && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-gray-600">
                           업로드 중...
                         </span>
                         <span className="text-sm text-gray-600">
-                          {pair.progress}%
+                          {triple.progress}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${pair.progress}%` }}
+                          style={{ width: `${triple.progress}%` }}
                         />
                       </div>
                     </div>
                   )}
 
                   {/* 완료 상태 */}
-                  {pair.completed && (
+                  {triple.completed && (
                     <div className="mt-4 p-3 bg-green-50 rounded-md">
                       <div className="flex items-center text-green-700">
                         <svg
@@ -1255,7 +1400,7 @@ export default function AdminPage() {
                   )}
 
                   {/* 에러 상태 */}
-                  {pair.error && (
+                  {triple.error && (
                     <div className="mt-4 p-3 bg-red-50 rounded-md">
                       <div className="flex items-center text-red-700">
                         <svg
@@ -1269,27 +1414,30 @@ export default function AdminPage() {
                             clipRule="evenodd"
                           />
                         </svg>
-                        {pair.error}
+                        {triple.error}
                       </div>
                     </div>
                   )}
 
                   {/* 개별 업로드 버튼 */}
-                  {pair.imageFile && pair.xmlFile && !pair.completed && (
-                    <div className="mt-4">
-                      <Button
-                        onClick={() => uploadPair(pair)}
-                        disabled={pair.uploading || pair.nameMatchError}
-                        className="w-full"
-                      >
-                        {pair.uploading
-                          ? "업로드 중..."
-                          : pair.nameMatchError
-                          ? "파일명 불일치"
-                          : "이 쌍 업로드"}
-                      </Button>
-                    </div>
-                  )}
+                  {triple.imageFile &&
+                    triple.xmlFile &&
+                    triple.svgFile &&
+                    !triple.completed && (
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => uploadTriple(triple)}
+                          disabled={triple.uploading || triple.nameMatchError}
+                          className="w-full"
+                        >
+                          {triple.uploading
+                            ? "업로드 중..."
+                            : triple.nameMatchError
+                            ? "파일명 불일치"
+                            : "이 트리플 업로드"}
+                        </Button>
+                      </div>
+                    )}
                 </div>
               ))}
 
@@ -1297,23 +1445,24 @@ export default function AdminPage() {
               <div className="flex justify-between items-center pt-4 border-t">
                 <Button
                   variant="outline"
-                  onClick={addNewPair}
+                  onClick={addNewTriple}
                   disabled={!authToken}
                 >
-                  + 파일 쌍 추가
+                  + 파일 트리플 추가
                 </Button>
 
                 <Button
                   onClick={uploadAll}
                   disabled={
                     !authToken ||
-                    uploadPairs.some((p) => p.uploading) ||
-                    !uploadPairs.some(
-                      (p) =>
-                        p.imageFile &&
-                        p.xmlFile &&
-                        !p.completed &&
-                        !p.nameMatchError
+                    uploadTriples.some((t) => t.uploading) ||
+                    !uploadTriples.some(
+                      (t) =>
+                        t.imageFile &&
+                        t.xmlFile &&
+                        t.svgFile &&
+                        !t.completed &&
+                        !t.nameMatchError
                     )
                   }
                   className="px-6"
@@ -1683,13 +1832,9 @@ export default function AdminPage() {
                             />
                           </div>
                           <div className="relative w-full h-32 bg-gray-100 border rounded overflow-hidden">
-                            <Image
-                              src={`https://cdn.chalpu.com/${guide.imageS3Key}`}
-                              alt={guide.fileName}
-                              fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                              priority={index < 4}
-                              className="object-cover"
+                            <SvgImagePreview
+                              guide={guide}
+                              className="object-contain"
                             />
                           </div>
                         </div>
@@ -1700,7 +1845,7 @@ export default function AdminPage() {
                           <div className="text-xs text-gray-500">
                             <p>ID: {guide.guideId}</p>
                             <p>
-                              카테고리(메인 - 서브): {guide.categoryName} - {" "}
+                              카테고리(메인 - 서브): {guide.categoryName} -{" "}
                               {guide.subCategoryName}
                             </p>
                             {guide.content && <p>설명: {guide.content}</p>}
@@ -1742,14 +1887,10 @@ export default function AdminPage() {
                               )
                             }
                           />
-                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
-                            <Image
-                              src={`https://cdn.chalpu.com/${guide.imageS3Key}`}
-                              alt={guide.fileName}
-                              fill
-                              sizes="64px"
-                              priority={index < 6}
-                              className="object-cover"
+                          <div className="relative w-32 h-16 flex-shrink-0 bg-gray-200 rounded overflow-hidden">
+                            <SvgImagePreview
+                              guide={guide}
+                              className="object-contain"
                             />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1759,7 +1900,7 @@ export default function AdminPage() {
                             <div className="flex items-center space-x-4 text-xs text-gray-500">
                               <span>ID: {guide.guideId}</span>
                               <span>
-                                카테고리(메인 - 서브): {guide.categoryName} - {" "}
+                                카테고리(메인 - 서브): {guide.categoryName} -{" "}
                                 {guide.subCategoryName}
                               </span>
                               {guide.content && (
