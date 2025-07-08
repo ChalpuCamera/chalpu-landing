@@ -3,7 +3,8 @@
 export interface Guide {
   guideId: number;
   content: string;
-  guideS3Key: string;
+  guideS3Key: string; // XML 파일 (안드로이드용)
+  svgS3Key: string; // SVG 파일 (UI 미리보기용)
   fileName: string;
   imageS3Key: string;
   categoryName: string;
@@ -16,16 +17,19 @@ export interface GuidePresignedUrlRequest {
 }
 
 export interface GuidePresignedUrlResponse {
-  guideS3Key: string;
+  guideS3Key: string; // XML 파일
   guideUploadUrl: string;
-  imageS3Key: string;
+  svgS3Key: string; // SVG 파일
+  svgUploadUrl: string;
+  imageS3Key: string; // 이미지 파일
   imageUploadUrl: string;
 }
 
 export interface GuideRegisterRequest {
-  guideS3Key: string;
+  guideS3Key: string; // XML 파일
+  svgS3Key: string; // SVG 파일
   fileName: string;
-  imageS3Key: string;
+  imageS3Key: string; // 이미지 파일
   content?: string;
   subCategoryId: number;
   tags?: string[];
@@ -34,9 +38,10 @@ export interface GuideRegisterRequest {
 export interface GuideRegisterResponse {
   guideId: number;
   content: string;
-  guideS3Key: string;
+  guideS3Key: string; // XML 파일
+  svgS3Key: string; // SVG 파일
   fileName: string;
-  imageS3Key: string;
+  imageS3Key: string; // 이미지 파일
   categoryName: string;
   subCategoryName: string;
   tags: string[];
