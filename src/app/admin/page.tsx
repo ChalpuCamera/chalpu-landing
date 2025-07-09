@@ -576,6 +576,7 @@ export default function AdminPage() {
       );
       toast.error(`${triple.fileName} 업로드 실패`);
     }
+    window.location.reload();
   };
 
   // 전체 업로드
@@ -606,6 +607,7 @@ export default function AdminPage() {
       );
       loadGuides();
     }
+    window.location.reload();
   };
 
   // 단일 가이드 삭제 처리
