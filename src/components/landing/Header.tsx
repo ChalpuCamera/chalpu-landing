@@ -29,7 +29,7 @@ const Header = () => {
           <div className="hidden md:block">
             <div className="relative">
               <Image
-                src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000"
+                src="/src/icon.svg"
                 alt="찰푸를 사용하여 촬영한 고품질 음식 사진 예시 - 플랫폼 승인 보장"
                 className="rounded-lg shadow-xl w-full max-h-96 object-cover"
                 priority
