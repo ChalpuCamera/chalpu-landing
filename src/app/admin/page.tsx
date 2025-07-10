@@ -452,7 +452,7 @@ export default function AdminPage() {
     ) as HTMLInputElement;
     if (input) input.value = "";
   };
-
+  
   // 개별 파일 트리플 업로드
   const uploadTriple = async (triple: FileUploadTriple) => {
     if (!triple.imageFile || !triple.xmlFile || !triple.svgFile || !authToken)
@@ -830,6 +830,43 @@ export default function AdminPage() {
         return "❌ 유효하지 않은 토큰";
       default:
         return "⚠️ 토큰 없음";
+    }
+  };
+
+  // 가이드 목록에서 XML 다운로드 함수
+  const handleGuideXmlDownload = async (guide: Guide) => {
+    try {
+      const xmlUrl = `https://cdn.chalpu.com/${guide.guideS3Key}`;
+      
+      // XML 파일 내용을 가져옵니다 (이미 서버에서 변환된 XML)
+      const response = await fetch(xmlUrl);
+      if (!response.ok) {
+        throw new Error(`XML 파일을 가져올 수 없습니다: ${response.status}`);
+      }
+      
+      const xmlContent = await response.text();
+      
+      // 파일명 설정 (확장자를 .xml로 보장)
+      const fileName = guide.fileName.endsWith('.xml') 
+        ? guide.fileName 
+        : guide.fileName.replace(/\.[^.]+$/, '.xml');
+      
+      // Blob을 생성하고 다운로드합니다
+      const blob = new Blob([xmlContent], { type: "application/xml" });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${fileName} 파일이 다운로드되었습니다.`);
+    } catch (error) {
+      console.error("XML 다운로드 실패:", error);
+      toast.error("XML 파일 다운로드에 실패했습니다.");
     }
   };
 
@@ -1808,6 +1845,14 @@ export default function AdminPage() {
                           </div>
                           <div className="flex space-x-2">
                             <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGuideXmlDownload(guide)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              XML 다운로드
+                            </Button>
+                            <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDeleteGuide(guide)}
@@ -1868,14 +1913,24 @@ export default function AdminPage() {
                           </div>
                         </div>
                         <div className="flex-shrink-0">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteGuide(guide)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            삭제
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGuideXmlDownload(guide)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              XML 다운로드
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteGuide(guide)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              삭제
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
