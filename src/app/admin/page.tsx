@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import svg2vectordrawable from "svg2vectordrawable";
 import {
   getGuides,
   deleteGuides,
@@ -36,7 +36,7 @@ import {
 import Image from "next/image";
 
 // SVG-이미지 나란히 보기 컴포넌트
-const   SvgImagePreview = ({
+const SvgImagePreview = ({
   guide,
   className,
 }: {
@@ -149,6 +149,7 @@ export default function AdminPage() {
     content?: string; // 가이드 설명
     tags: string[]; // 태그 목록
     tagInput: string; // 태그 입력 필드
+    isComposing: boolean; // 한글 입력 상태 관리
   }
 
   const [uploadTriples, setUploadTriples] = useState<FileUploadTriple[]>([
@@ -167,6 +168,7 @@ export default function AdminPage() {
       content: "",
       tags: [],
       tagInput: "",
+      isComposing: false,
     },
   ]);
 
@@ -279,6 +281,7 @@ export default function AdminPage() {
       content: "",
       tags: [],
       tagInput: "",
+      isComposing: false,
     };
     setUploadTriples((prev) => [...prev, newTriple]);
   };
@@ -292,88 +295,17 @@ export default function AdminPage() {
   const convertSvgToAndroidXml = async (svgFile: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const svgContent = e.target?.result as string;
-
-          // DOM parser로 SVG 파싱
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
-          const svgElement = svgDoc.querySelector("svg");
-
-          if (!svgElement) {
-            throw new Error("유효한 SVG 파일이 아닙니다.");
-          }
-
-          // SVG 속성 추출
-          const width = svgElement.getAttribute("width") || "24";
-          const height = svgElement.getAttribute("height") || "24";
-          const viewBox =
-            svgElement.getAttribute("viewBox") || `0 0 ${width} ${height}`;
-          const viewBoxValues = viewBox.split(" ");
-          const viewportWidth = viewBoxValues[2] || width;
-          const viewportHeight = viewBoxValues[3] || height;
-
-          // 안드로이드 Vector Drawable XML 생성
-          let vectorXml = `<?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="${parseInt(width.replace(/[^0-9]/g, "")) || 24}dp"
-    android:height="${parseInt(height.replace(/[^0-9]/g, "")) || 24}dp"
-    android:viewportWidth="${viewportWidth}"
-    android:viewportHeight="${viewportHeight}">
-`;
-
-          // path 요소들 변환
-          const paths = svgElement.querySelectorAll("path");
-          paths.forEach((path) => {
-            const pathData = path.getAttribute("d") || "";
-            const fill = path.getAttribute("fill") || "#000000";
-            const stroke = path.getAttribute("stroke");
-            const strokeWidth = path.getAttribute("stroke-width");
-
-            vectorXml += `    <path android:pathData="${pathData}"`;
-
-            if (fill && fill !== "none") {
-              vectorXml += `\n        android:fillColor="${fill}"`;
-            }
-
-            if (stroke && stroke !== "none") {
-              vectorXml += `\n        android:strokeColor="${stroke}"`;
-            }
-
-            if (strokeWidth) {
-              vectorXml += `\n        android:strokeWidth="${strokeWidth}"`;
-            }
-
-            vectorXml += " />\n";
-          });
-
-          // group 요소들도 처리 (기본적인 변환)
-          const groups = svgElement.querySelectorAll("g");
-          groups.forEach((group) => {
-            const groupPaths = group.querySelectorAll("path");
-            if (groupPaths.length > 0) {
-              vectorXml += `    <group>\n`;
-              groupPaths.forEach((path) => {
-                const pathData = path.getAttribute("d") || "";
-                const fill =
-                  path.getAttribute("fill") ||
-                  group.getAttribute("fill") ||
-                  "#000000";
-                vectorXml += `        <path android:pathData="${pathData}"\n            android:fillColor="${fill}" />\n`;
-              });
-              vectorXml += `    </group>\n`;
-            }
-          });
-
-          vectorXml += `</vector>`;
+          const xmlContent = await svg2vectordrawable(svgContent);
 
           // 새로운 XML 파일명 생성
           const originalName = svgFile.name.replace(/\.svg$/i, "");
           const xmlFileName = `${originalName}.xml`;
 
           // Blob을 File로 변환
-          const blob = new Blob([vectorXml], { type: "application/xml" });
+          const blob = new Blob([xmlContent], { type: "application/xml" });
           const xmlFile = new File([blob], xmlFileName, {
             type: "application/xml",
             lastModified: Date.now(),
@@ -1236,7 +1168,26 @@ export default function AdminPage() {
                           )
                         );
                       }}
+                      onCompositionStart={() => {
+                        setUploadTriples((prev) =>
+                          prev.map((t) =>
+                            t.id === triple.id ? { ...t, isComposing: true } : t
+                          )
+                        );
+                      }}
+                      onCompositionEnd={() => {
+                        setUploadTriples((prev) =>
+                          prev.map((t) =>
+                            t.id === triple.id
+                              ? { ...t, isComposing: false }
+                              : t
+                          )
+                        );
+                      }}
                       onKeyDown={(e) => {
+                        // composition 중이면 태그 추가하지 않음
+                        if (triple.isComposing) return;
+
                         if (e.key === "Enter" || e.key === ",") {
                           e.preventDefault();
                           const newTag = triple.tagInput.trim();
@@ -1279,20 +1230,22 @@ export default function AdminPage() {
                         }
                       }}
                       onBlur={() => {
-                        // 포커스를 잃을 때도 태그 추가
-                        const newTag = triple.tagInput.trim();
-                        if (newTag && !triple.tags.includes(newTag)) {
-                          setUploadTriples((prev) =>
-                            prev.map((t) =>
-                              t.id === triple.id
-                                ? {
-                                    ...t,
-                                    tags: [...t.tags, newTag],
-                                    tagInput: "",
-                                  }
-                                : t
-                            )
-                          );
+                        // 포커스를 잃을 때도 태그 추가 (composition 중이 아닐 때만)
+                        if (!triple.isComposing) {
+                          const newTag = triple.tagInput.trim();
+                          if (newTag && !triple.tags.includes(newTag)) {
+                            setUploadTriples((prev) =>
+                              prev.map((t) =>
+                                t.id === triple.id
+                                  ? {
+                                      ...t,
+                                      tags: [...t.tags, newTag],
+                                      tagInput: "",
+                                    }
+                                  : t
+                              )
+                            );
+                          }
                         }
                       }}
                       disabled={triple.uploading || triple.completed}
@@ -1833,7 +1786,7 @@ export default function AdminPage() {
                               }
                             />
                           </div>
-                          <div className="relative w-full h-32 bg-gray-100 border rounded overflow-hidden">
+                          <div className="relative w-full h-24 bg-gray-100 border rounded overflow-hidden">
                             <SvgImagePreview
                               guide={guide}
                               className="object-contain"
