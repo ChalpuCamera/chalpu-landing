@@ -1,17 +1,14 @@
-"use client";
-import { useState } from "react";
-import { Button } from "@/components/landing/ui/button";
-import { Input } from "@/components/landing/ui/input";
-import { sendContact } from "@/app/services/apis";
+// import { Button } from "@/components/landing/ui/button";
+// import { Input } from "@/components/landing/ui/input";
 
 const FooterSection = () => {
-  const [contactEmail, setContactEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  // const [contactEmail, setContactEmail] = useState("");
+  // const [isLoading, setIsLoading] = useState(false);
 
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // const handleContactSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
     
-  };
+  // };
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -35,7 +32,7 @@ const FooterSection = () => {
           </div>
           <div>
             <h3 className="text-xl font-bold mb-4">문의하기</h3>
-            <form onSubmit={handleContactSubmit} className="space-y-4">
+            {/* <form onSubmit={handleContactSubmit} className="space-y-4">
               <div>
                 <Input
                   type="email"
@@ -48,7 +45,7 @@ const FooterSection = () => {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "전송 중..." : "문의하기"}
               </Button>
-            </form>
+            </form> */}
           </div>
         </div>
         <div className="border-t border-gray-700 mt-12 pt-6 text-sm text-gray-400 text-center">
