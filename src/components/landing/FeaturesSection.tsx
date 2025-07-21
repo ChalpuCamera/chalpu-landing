@@ -4,6 +4,7 @@ import {
   CheckSquare,
   TrendingUp,
 } from "lucide-react";
+import CtaButton from "./CtaButton";
 
 const features = [
   {
@@ -38,6 +39,12 @@ const FeaturesSection = () => {
       className="container mx-auto px-4 section-padding"
       aria-labelledby="features-heading"
     >
+      {/* TODO: 추후 이미지 추가 예정 */}
+      <div className="max-w-5xl mx-auto mb-12">
+        <div className="rounded-lg shadow-xl w-full h-96 bg-gray-200 flex items-center justify-center">
+          <p className="text-gray-500">이미지 추가 예정</p>
+        </div>
+      </div>
       <div className="text-center mb-12">
         <h2
           id="features-heading"

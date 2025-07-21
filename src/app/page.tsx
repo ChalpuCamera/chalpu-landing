@@ -4,6 +4,7 @@ import Header from "@/components/landing/Header";
 import FeaturesSection from "@/components/landing/FeaturesSection";
 import ReviewSection from "@/components/landing/ReviewSection";
 import FooterSection from "@/components/landing/FooterSection";
+import FloatingCtaButton from "@/components/landing/FloatingCtaButton";
 import { Toaster as Sonner } from "@/components/landing/ui/sonner";
 
 export const metadata: Metadata = {
@@ -151,6 +152,7 @@ export default function Home() {
         <FeaturesSection />
         <ReviewSection />
         <FooterSection />
+        <FloatingCtaButton />
       </main>
     </>
   );

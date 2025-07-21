@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/landing/ui/card";
 import { Star } from "lucide-react";
+import CtaButton from "./CtaButton";
 
 const ReviewSection = () => {
   const reviews = [
