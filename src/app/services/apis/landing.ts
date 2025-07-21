@@ -15,7 +15,7 @@ interface ContactResponse {
 // 선착순 무료 체험 신청 API
 const sendContact = async (data: ContactRequest): Promise<ContactResponse> => {
   const baseURL =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const response = await fetch(`${baseURL}/landing/inquiry`, {
     method: "POST",

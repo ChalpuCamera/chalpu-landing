@@ -36,7 +36,10 @@ export default function Error({ error, reset }: ErrorProps) {
 
           <div className="text-sm text-gray-500">
             <p>
-              문제가 지속되면 페이지를 새로고침하거나 고객센터로 문의해주세요.
+              문제가 지속되면 페이지를 새로고침하거나 고객센터로 문의해주세요.{" "}
+              <span className="whitespace-nowrap">
+                chalpuofficial@gmail.com
+              </span>
             </p>
           </div>
         </div>

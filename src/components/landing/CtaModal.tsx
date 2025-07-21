@@ -107,7 +107,7 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
+            <div className="space-y-1">
               <div>
                 <Label htmlFor="email">이메일 주소</Label>
                 <Input
@@ -148,8 +148,9 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
             </div>
 
             <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                현재 사진 업로드에서 가장 불편한 점은 무엇인가요?
+              <Label className="flex flex-col items-center text-base font-semibold">
+                현재 플랫폼(배민, 쿠팡이츠 등) 사진 업로드에서 <br />
+                <span className="whitespace-nowrap">가장 불편한 점은 무엇인가요?</span>
               </Label>
               <RadioGroup
                 value={formData.surveyAnswer}
@@ -163,11 +164,11 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="사진이 잘 안 나옴" id="quality" />
-                  <Label htmlFor="quality">사진이 잘 안 나옴</Label>
+                  <Label htmlFor="quality">원하는 스타일의 사진이 잘 안 나옴</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="가이드라인이 어려움" id="guidelines" />
-                  <Label htmlFor="guidelines">가이드라인이 어려움</Label>
+                  <Label htmlFor="guidelines">플랫폼 별 가이드라인(픽셀, 해상도 등)이 어려움</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="other" id="other" />
@@ -197,7 +198,7 @@ const CtaModal = ({ isOpen, onClose }: CtaModalProps) => {
                 />
                 <div className="text-sm">
                   <Label htmlFor="privacy" className="font-medium">
-                    개인정보 수집 및 활용에 동의합니다
+                    개인정보 수집 및 활용 동의 (필수)
                   </Label>
                   <button
                     type="button"
