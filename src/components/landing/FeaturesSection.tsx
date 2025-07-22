@@ -23,7 +23,7 @@ const features = [
   {
     icon: <ImageIcon className="h-10 w-10 text-teal-500" aria-hidden="true" />,
     title: "음식별 자동 필터 및 보정",
-    description: "AI가 음식을 인식하여 최적의 필터와 보정을 자동 적용합니다.",
+    description: "최적의 필터와 보정을 자동 적용합니다.",
   },
   {
     icon: <TrendingUp className="h-10 w-10 text-teal-500" aria-hidden="true" />,
