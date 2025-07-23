@@ -4,6 +4,7 @@ import {
   CheckSquare,
   TrendingUp,
 } from "lucide-react";
+import Image from "next/image";
 import CtaButton from "./CtaButton";
 
 const features = [
@@ -39,11 +40,14 @@ const FeaturesSection = () => {
       className="container mx-auto px-4 section-padding"
       aria-labelledby="features-heading"
     >
-      {/* TODO: 추후 이미지 추가 예정 */}
-      <div className="max-w-5xl mx-auto mb-12">
-        <div className="rounded-lg shadow-xl w-full h-96 bg-gray-200 flex items-center justify-center">
-          <p className="text-gray-500">이미지 추가 예정</p>
-        </div>
+      <div className="max-w-5xl mx-auto mb-12 flex justify-center">
+        <Image
+          src="/landing.gif"
+          alt="찰푸 앱 화면"
+          width={0}
+          height={0}
+          className="rounded-lg shadow-xl w-auto h-auto"
+        />
       </div>
       <div className="text-center mb-12">
         <h2
