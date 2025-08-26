@@ -43,7 +43,7 @@ const BrandHeader = () => {
           </div>
 
           {/* 베타 배지 */}
-          <div className="bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
+          <div className="flex items-center justify-center bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
             <span className="text-xs font-semibold text-blue-700 tracking-wide">
               BETA
             </span>
