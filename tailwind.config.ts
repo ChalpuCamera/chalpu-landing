@@ -75,6 +75,9 @@ export default {
           800: "#1e40af",
           900: "#1e3a8a",
         },
+        chalpu: {
+          DEFAULT: "#3b82f6",
+        },
         teal: {
           DEFAULT: "#00B8D9",
           50: "#E5F8FC",

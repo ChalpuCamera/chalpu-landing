@@ -1,4 +1,3 @@
-import Image from "next/image";
 import CtaButton from "@/components/landing/CtaButton";
 
 const Header = () => {
